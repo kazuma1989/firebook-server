@@ -26,6 +26,8 @@ async function run() {
           "global.GENTLY": JSON.stringify(false),
         },
       })
+
+      console.log("Built!")
     }
 
     if (watch) {
