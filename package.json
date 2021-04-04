@@ -14,8 +14,12 @@
   "engines": {
     "node": ">=10.24.0"
   },
-  "main": "./dist/index.js",
-  "bin": "./cli.js",
+  "files": [
+    "dist/index.js",
+    "cli.js"
+  ],
+  "main": "dist/index.js",
+  "bin": "cli.js",
   "scripts": {
     "start": "./cli.js",
     "build": "node build",
