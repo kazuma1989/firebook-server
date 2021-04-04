@@ -1,6 +1,6 @@
 {
   "name": "@kazuma1989/firebook-server",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "A mock backend server for Firebook",
   "keywords": [
     "firebook",
@@ -22,8 +22,8 @@
   "bin": "cli.js",
   "scripts": {
     "start": "./cli.js",
-    "build": "node build",
-    "build:watch": "node build --watch"
+    "watch": "node build --watch",
+    "prepack": "node build"
   },
   "dependencies": {
     "express": "^4.17.1",
