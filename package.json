@@ -18,7 +18,6 @@
     "dist/index.js",
     "cli.js"
   ],
-  "main": "dist/index.js",
   "bin": "cli.js",
   "scripts": {
     "start": "./cli.js",
