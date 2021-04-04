@@ -5,18 +5,18 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "name": "nodemon server",
-      "program": "${workspaceFolder}/dist/index.js",
+      "console": "internalConsole",
+      "internalConsoleOptions": "openOnFirstSessionStart",
+      "name": "nodemon",
+      "program": "${workspaceFolder}/cli.js",
       "request": "launch",
       "restart": true,
       "runtimeExecutable": "npx",
       "skipFiles": ["<node_internals>/**"],
       "type": "pwa-node",
 
-      // npx nodemon ${workspaceFolder}/dist/index.js
-      "runtimeArgs": ["nodemon"],
+      // npx nodemon -e js ${workspaceFolder}/cli.js
+      "runtimeArgs": ["nodemon", "-e", "js"],
 
       // https://github.com/microsoft/vscode-js-debug/issues/911#issuecomment-762554186
       "nodeVersionHint": 10

@@ -18,14 +18,18 @@
   "bin": "./cli.js",
   "scripts": {
     "start": "./cli.js",
-    "build": "esbuild"
+    "build": "node build",
+    "build:watch": "node build --watch"
   },
   "dependencies": {
     "express": "^4.17.1",
     "formidable": "^1.2.2"
   },
   "devDependencies": {
+    "@types/express": "^4.17.11",
+    "@types/formidable": "^1.2.1",
     "@types/node": "10.x.x",
+    "chokidar": "^3.5.1",
     "esbuild": "^0.11.5",
     "prettier": "^2.2.1",
     "typescript": "^4.2.3"
