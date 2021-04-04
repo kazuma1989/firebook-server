@@ -1,0 +1,25 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "name": "nodemon server",
+      "program": "${workspaceFolder}/dist/index.js",
+      "request": "launch",
+      "restart": true,
+      "runtimeExecutable": "npx",
+      "skipFiles": ["<node_internals>/**"],
+      "type": "pwa-node",
+
+      // npx nodemon ${workspaceFolder}/dist/index.js
+      "runtimeArgs": ["nodemon"],
+
+      // https://github.com/microsoft/vscode-js-debug/issues/911#issuecomment-762554186
+      "nodeVersionHint": 10
+    }
+  ]
+}
