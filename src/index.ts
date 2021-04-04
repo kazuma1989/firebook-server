@@ -1,50 +1,95 @@
 import express from "express"
 import formidable from "formidable"
+import mri from "mri"
 import * as path from "path"
 
-const app = express()
-const port = 5000
+/**
+ * CLI 引数をパースする。
+ */
+function parse(argv: string[]) {
+  const { host, port, storage } = mri(argv, {
+    default: {
+      host: "localhost",
+      port: 5000,
+      storage: "storage",
+    },
+  }) as mri.DictionaryObject<unknown>
 
-// 開発サーバーなので緩い制約で CORS を受け入れる。
-app.use((req, resp, next) => {
-  resp.setHeader("Access-Control-Allow-Origin", "*")
-  resp.setHeader("Access-Control-Allow-Methods", "*")
+  if (typeof host !== "string" || host === "") {
+    throw new Error(`Invalid host: ${host}`)
+  }
+  if (typeof port !== "number") {
+    throw new Error(`Invalid port: ${port}`)
+  }
+  if (typeof storage !== "string") {
+    throw new Error(`Invalid storage: ${storage}`)
+  }
 
-  next()
-})
+  return {
+    host,
+    port,
+    storage,
+  }
+}
 
-const storageDir = path.join(process.cwd(), "storage")
+/**
+ * メインの処理。
+ */
+async function run() {
+  try {
+    const option = parse(process.argv.slice(2))
+    const storageDir = path.resolve(process.cwd(), option.storage)
 
-// ファイルアップロードのエンドポイント。
-app.post("/storage", (req, resp, next) => {
-  const form = new formidable.IncomingForm({
-    uploadDir: storageDir,
-    keepExtensions: true,
-  })
+    const app = express()
 
-  form.parse(req, (err, fields, files) => {
-    if (err) {
-      next(err)
-      return
-    }
+    // 開発サーバーなので緩い制約で CORS を受け入れる。
+    app.use((req, resp, next) => {
+      resp.setHeader("Access-Control-Allow-Origin", "*")
+      resp.setHeader("Access-Control-Allow-Methods", "*")
 
-    const [file] = Object.values(files)
-    if (!file || Array.isArray(file)) {
       next()
-      return
-    }
-
-    const host = req.headers.host ?? `localhost:${port}`
-
-    resp.json({
-      downloadURL: `http://${host}/storage/${path.basename(file.path)}`,
     })
-  })
-})
 
-// storage ディレクトリの中身は静的ファイルとしてレスポンスする。
-app.use("/storage", express.static(storageDir))
+    // ファイルアップロードのエンドポイント。
+    app.post("/storage", (req, resp, next) => {
+      const form = new formidable.IncomingForm({
+        uploadDir: storageDir,
+        keepExtensions: true,
+      })
 
-app.listen(port, () => {
-  console.log(`Server is listening at http://localhost:${port}`)
-})
+      form.parse(req, (err, fields, files) => {
+        if (err) {
+          next(err)
+          return
+        }
+
+        const [file] = Object.values(files)
+        if (!file || Array.isArray(file)) {
+          next()
+          return
+        }
+
+        const origin = `http://${req.headers.host ?? option.host}:${
+          option.port
+        }`
+
+        resp.json({
+          downloadURL: `${origin}/storage/${path.basename(file.path)}`,
+        })
+      })
+    })
+
+    // storage ディレクトリの中身は静的ファイルとしてレスポンスする。
+    app.use("/storage", express.static(storageDir))
+
+    app.listen(option.port, option.host, () => {
+      console.log(`Server is listening at http://${option.host}:${option.port}`)
+    })
+  } catch (err) {
+    console.error(err)
+
+    process.exit(1)
+  }
+}
+
+run()
