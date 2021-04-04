@@ -13,7 +13,7 @@ app.use((req, resp, next) => {
   next()
 })
 
-const storageDir = path.join(__dirname, "storage")
+const storageDir = path.join(process.cwd(), "storage")
 
 // ファイルアップロードのエンドポイント。
 app.post("/storage", (req, resp, next) => {
