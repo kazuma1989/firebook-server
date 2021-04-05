@@ -6,12 +6,6 @@ const METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"] as const
 type METHODS = typeof METHODS[number]
 
 interface Route {
-  /** @example `/foo/bar` */
-  path: string
-
-  /** Alias for `path` */
-  url: string
-
   /** @example `GET /foo/(?<id>.+)` */
   eventName: `${METHODS} ${string}`
 
@@ -23,6 +17,9 @@ interface Route {
 
   /** RegExp object which represents `rawPathPattern`. Case insensitive */
   pathPattern: RegExp
+
+  /** Matching URL */
+  url: URL
 
   /** RegExp matching groups for `pathPattern` */
   pathParam: {
@@ -124,12 +121,11 @@ export function createServer(): Server {
         if (!match) continue
 
         route = {
-          path: match[0]!,
-          url: match[0]!,
           eventName,
           method,
           rawPathPattern,
           pathPattern,
+          url,
           pathParam: match.groups ?? {},
         }
         break
