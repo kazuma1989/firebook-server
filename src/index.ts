@@ -69,7 +69,7 @@ function parse(argv: string[]): CLIOption {
 
 interface Server extends http.Server {
   on(
-    eventName: `${METHODS} ${string}`,
+    event: `${METHODS} ${string}`,
     listener: (
       req: http.IncomingMessage,
       resp: http.ServerResponse,
@@ -77,70 +77,87 @@ interface Server extends http.Server {
     ) => void
   ): this
 
+  on(
+    event: "request",
+    listener: (req: http.IncomingMessage, resp: http.ServerResponse) => void
+  ): this
+
   on(event: string, listener: (...args: any[]) => void): this
 }
 
+/**
+ * @example
+ * const server = createServer()
+ *
+ * server.on("request", (req, resp) => {
+ *   console.log("request", req.url)
+ * })
+ *
+ * server.on("GET /users/(?<id>.+)", (req, resp, { pathParam: { id } }) => {
+ *   resp.end(id)
+ * })
+ *
+ * server.listen(port, host, () => {
+ *   console.log(`Server is listening at http://${host}:${port}`)
+ * })
+ */
 function createServer(): Server {
-  return http
-    .createServer()
-    .once("listening", function setup(this: http.Server) {
-      const routes = this.eventNames()
-        .filter(
-          (eventName): eventName is `${METHODS} ${string}` =>
-            typeof eventName === "string" &&
-            METHODS.some((method) => eventName.startsWith(`${method} `))
-        )
-        .map((eventName) => {
-          const [method, rawPathPattern] = eventName.split(" ", 2) as [
-            METHODS,
-            string
-          ]
+  const server: Server = http.createServer()
 
-          return {
-            eventName,
-            method,
-            rawPathPattern,
-            pathPattern: new RegExp(`^${rawPathPattern}$`, "i"),
-          }
-        })
-
-      this.on(
-        "request",
-        (req: http.IncomingMessage, resp: http.ServerResponse) => {
-          console.log("request", req.url)
-
-          let route: Route | undefined
-          for (let i = 0; i < routes.length; i++) {
-            const { eventName, method, rawPathPattern, pathPattern } = routes[
-              i
-            ]!
-            if (req.method !== method) continue
-
-            const match = req.url?.match(pathPattern)
-            if (!match) continue
-
-            route = {
-              path: match[0]!,
-              url: match[0]!,
-              eventName,
-              method,
-              rawPathPattern,
-              pathPattern,
-              pathParam: match.groups ?? {},
-            }
-          }
-
-          if (!route) {
-            resp.writeHead(404)
-            resp.end()
-
-            return
-          }
-
-          this.emit(route.eventName, req, resp, route)
-        }
+  server.once("listening", function setup(this: http.Server) {
+    const routes = this.eventNames()
+      .filter(
+        (eventName): eventName is `${METHODS} ${string}` =>
+          typeof eventName === "string" &&
+          METHODS.some((method) => eventName.startsWith(`${method} `))
       )
+      .map((eventName) => {
+        const [method, rawPathPattern] = eventName.split(" ", 2) as [
+          METHODS,
+          string
+        ]
+
+        return {
+          eventName,
+          method,
+          rawPathPattern,
+          pathPattern: new RegExp(`^${rawPathPattern}$`, "i"),
+        }
+      })
+
+    this.on("request", (req, resp) => {
+      let route: Route | undefined
+      for (let i = 0; i < routes.length; i++) {
+        const { eventName, method, rawPathPattern, pathPattern } = routes[i]!
+        if (req.method !== method) continue
+
+        const match = req.url?.match(pathPattern)
+        if (!match) continue
+
+        route = {
+          path: match[0]!,
+          url: match[0]!,
+          eventName,
+          method,
+          rawPathPattern,
+          pathPattern,
+          pathParam: match.groups ?? {},
+        }
+        break
+      }
+
+      if (!route) {
+        resp.writeHead(404)
+        resp.end()
+
+        return
+      }
+
+      this.emit(route.eventName, req, resp, route)
     })
+  })
+
+  return server
 }
 
 /**
@@ -153,9 +170,22 @@ async function run() {
 
     const server = createServer()
 
+    server.on("request", (req, resp) => {
+      console.log("request", req.url)
+    })
+
+    // 開発サーバーなので緩い制約で CORS を受け入れる。
+    server.on("request", (req, resp) => {
+      resp.setHeader("Access-Control-Allow-Origin", "*")
+      resp.setHeader("Access-Control-Allow-Methods", "*")
+    })
+
+    // storage ディレクトリの中身は静的ファイルとしてレスポンスする。
     server.on(
       "GET /storage/(?<file>.+)",
       (req, resp, { pathParam: { file } }) => {
+        console.debug("file", file)
+
         const notFound = () => {
           resp.writeHead(404)
           resp.end()
@@ -171,11 +201,26 @@ async function run() {
           return
         }
 
-        fs.createReadStream(path.resolve(storageDir, path.normalize(file)))
+        const mimeTypes = {
+          ".png": "image/png",
+          ".jpg": "image/jpg",
+          ".jpeg": "image/jpg",
+          ".gif": "image/gif",
+        }
+
+        const filePath = path.join(storageDir, path.normalize(file))
+
+        fs.createReadStream(filePath)
           .on("error", notFound)
+          .once("open", () => {
+            resp.setHeader(
+              "Content-Type",
+              mimeTypes[path.extname(filePath).toLowerCase()] ??
+                "application/octet-stream"
+            )
+          })
           .pipe(resp)
           .on("finish", () => {
-            resp.writeHead(200, { "Content-Type": "image/png" })
             resp.end()
           })
           .on("error", internalError)
@@ -185,16 +230,6 @@ async function run() {
     server.listen(option.port, option.host, () => {
       console.log(`Server is listening at http://${option.host}:${option.port}`)
     })
-
-    // const app = express()
-
-    // // 開発サーバーなので緩い制約で CORS を受け入れる。
-    // app.use((req, resp, next) => {
-    //   resp.setHeader("Access-Control-Allow-Origin", "*")
-    //   resp.setHeader("Access-Control-Allow-Methods", "*")
-
-    //   next()
-    // })
 
     // // ファイルアップロードのエンドポイント。
     // app.post("/storage", (req, resp, next) => {
@@ -223,13 +258,6 @@ async function run() {
     //       downloadURL: `${origin}/storage/${path.basename(file.path)}`,
     //     })
     //   })
-    // })
-
-    // // storage ディレクトリの中身は静的ファイルとしてレスポンスする。
-    // app.use("/storage", express.static(storageDir))
-
-    // app.listen(option.port, option.host, () => {
-    //   console.log(`Server is listening at http://${option.host}:${option.port}`)
     // })
   } catch (err) {
     console.error(err)
