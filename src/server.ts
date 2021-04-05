@@ -1,4 +1,6 @@
 import * as http from "http"
+import * as path from "path"
+import { URL } from "url"
 
 const METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"] as const
 type METHODS = typeof METHODS[number]
@@ -63,9 +65,7 @@ interface Server extends http.Server {
  * })
  */
 export function createServer(): Server {
-  const server: Server = http.createServer()
-
-  server.once("listening", function setup(this: http.Server) {
+  return http.createServer().once("listening", function setup(this: Server) {
     const routes = this.eventNames()
       .filter(
         (eventName): eventName is `${METHODS} ${string}` =>
@@ -87,12 +87,40 @@ export function createServer(): Server {
       })
 
     this.on("request", (req, resp) => {
+      const notFound = () => {
+        resp.writeHead(404)
+        resp.end()
+      }
+
+      const badRequest = () => {
+        resp.writeHead(400)
+        resp.end()
+      }
+
+      if (!req.method || !req.url) {
+        notFound()
+        return
+      }
+
+      const normalized = {
+        method: req.method?.toUpperCase(),
+        url: path.posix.normalize(req.url),
+      }
+
       let route: Route | undefined
       for (let i = 0; i < routes.length; i++) {
         const { eventName, method, rawPathPattern, pathPattern } = routes[i]!
-        if (req.method !== method) continue
+        if (normalized.method !== method) continue
 
-        const match = req.url?.match(pathPattern)
+        let url: URL
+        try {
+          url = new URL(normalized.url, `http://${req.headers.host}`)
+        } catch (err) {
+          badRequest()
+          return
+        }
+
+        const match = url.pathname.match(pathPattern)
         if (!match) continue
 
         route = {
@@ -108,15 +136,11 @@ export function createServer(): Server {
       }
 
       if (!route) {
-        resp.writeHead(404)
-        resp.end()
-
+        notFound()
         return
       }
 
       this.emit(route.eventName, req, resp, route)
     })
   })
-
-  return server
 }
