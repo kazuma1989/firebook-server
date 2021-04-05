@@ -15,12 +15,10 @@
     "node": ">=10.24.0"
   },
   "files": [
-    "dist/index.js",
-    "cli.js"
+    "dist/index.js"
   ],
-  "bin": "cli.js",
+  "bin": "dist/index.js",
   "scripts": {
-    "start": "./cli.js",
     "watch": "node build --watch",
     "prepack": "node build"
   },

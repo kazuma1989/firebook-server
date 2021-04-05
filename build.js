@@ -24,6 +24,9 @@ async function run() {
       format: "cjs",
       entryPoints: [entryPoint],
       outfile,
+      banner: {
+        js: "#!/usr/bin/env node",
+      },
       watch: watch
         ? {
             onRebuild() {
