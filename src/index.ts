@@ -1,4 +1,4 @@
-// import formidable from "formidable"
+import formidable from "formidable"
 import * as fs from "fs"
 import * as http from "http"
 import mri from "mri"
@@ -227,38 +227,50 @@ async function run() {
       }
     )
 
+    // ファイルアップロードのエンドポイント。
+    server.on("POST /storage", (req, resp) => {
+      const badRequest = () => {
+        resp.writeHead(400)
+        resp.end()
+      }
+
+      const form = new formidable.IncomingForm({
+        uploadDir: storageDir,
+        keepExtensions: true,
+      })
+
+      form.parse(req, (err, fields, files) => {
+        if (err) {
+          console.error("error", err)
+
+          badRequest()
+          return
+        }
+
+        const [file] = Object.values(files)
+        if (!file || Array.isArray(file)) {
+          badRequest()
+          return
+        }
+
+        const origin = `http://${
+          req.headers.host ?? `${option.host}:${option.port}`
+        }`
+
+        resp.writeHead(200, {
+          "Content-Type": "application/json",
+        })
+        resp.end(
+          JSON.stringify({
+            downloadURL: `${origin}/storage/${path.basename(file.path)}`,
+          })
+        )
+      })
+    })
+
     server.listen(option.port, option.host, () => {
       console.log(`Server is listening at http://${option.host}:${option.port}`)
     })
-
-    // // ファイルアップロードのエンドポイント。
-    // app.post("/storage", (req, resp, next) => {
-    //   const form = new formidable.IncomingForm({
-    //     uploadDir: storageDir,
-    //     keepExtensions: true,
-    //   })
-
-    //   form.parse(req, (err, fields, files) => {
-    //     if (err) {
-    //       next(err)
-    //       return
-    //     }
-
-    //     const [file] = Object.values(files)
-    //     if (!file || Array.isArray(file)) {
-    //       next()
-    //       return
-    //     }
-
-    //     const origin = `http://${req.headers.host ?? option.host}:${
-    //       option.port
-    //     }`
-
-    //     resp.json({
-    //       downloadURL: `${origin}/storage/${path.basename(file.path)}`,
-    //     })
-    //   })
-    // })
   } catch (err) {
     console.error(err)
 
