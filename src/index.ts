@@ -112,12 +112,6 @@ async function run() {
       })
     })
 
-    server.on("GET /posts(?<id>/.+)?", (req, resp, { pathParam: { id } }) => {
-      console.debug("id", id)
-
-      resp.end(id)
-    })
-
     server.listen(option.port, option.hostname, () => {
       console.log(
         `Server is listening at http://${option.hostname}:${option.port}`
