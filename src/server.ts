@@ -98,7 +98,7 @@ export function createServer(): Server {
       }
 
       if (!req.method || !req.url) {
-        notFound()
+        badRequest()
         return
       }
 
