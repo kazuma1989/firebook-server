@@ -4,6 +4,7 @@
 const esbuild = require("esbuild")
 const mri = require("mri")
 const path = require("path")
+const { dependencies } = require("./package.json")
 
 async function run() {
   const { watch } = mri(process.argv.slice(2), {
@@ -18,7 +19,7 @@ async function run() {
       charset: "utf8",
       sourcemap: true,
       bundle: true,
-      external: ["formidable", "mri"],
+      external: Object.keys(dependencies),
       platform: "node",
       target: "node10",
       format: "cjs",
