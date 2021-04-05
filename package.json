@@ -28,6 +28,10 @@
     "formidable": "^1.2.2",
     "mri": "^1.1.6"
   },
+  "bundledDependencies": [
+    "formidable",
+    "mri"
+  ],
   "devDependencies": {
     "@types/formidable": "^1.2.1",
     "@types/mri": "^1.1.0",
