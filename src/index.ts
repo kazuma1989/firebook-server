@@ -98,7 +98,7 @@ async function run() {
         }
 
         const origin = `http://${
-          req.headers.host ?? `${option.host}:${option.port}`
+          req.headers.host ?? `${option.hostname}:${option.port}`
         }`
 
         resp.writeHead(200, {
@@ -112,8 +112,16 @@ async function run() {
       })
     })
 
-    server.listen(option.port, option.host, () => {
-      console.log(`Server is listening at http://${option.host}:${option.port}`)
+    server.on("GET /posts(?<id>/.+)?", (req, resp, { pathParam: { id } }) => {
+      console.debug("id", id)
+
+      resp.end(id)
+    })
+
+    server.listen(option.port, option.hostname, () => {
+      console.log(
+        `Server is listening at http://${option.hostname}:${option.port}`
+      )
     })
   } catch (err) {
     console.error(err)

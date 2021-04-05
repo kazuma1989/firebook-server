@@ -1,7 +1,7 @@
 import mri from "mri"
 
 interface CLIOption {
-  host: string
+  hostname: string
   port: number
   storage: string
 }
@@ -10,16 +10,19 @@ interface CLIOption {
  * CLI 引数をパースする。
  */
 export function parse(argv: string[]): CLIOption {
-  const { host, port, storage } = mri(argv, {
+  const { host: hostname, port, storage } = mri(argv, {
     default: {
-      host: "localhost",
+      hostname: "localhost",
       port: 5000,
       storage: "storage",
     },
+    alias: {
+      hostname: ["host"],
+    },
   }) as mri.DictionaryObject<unknown>
 
-  if (typeof host !== "string" || host === "") {
-    throw new Error(`Invalid host: ${host}`)
+  if (typeof hostname !== "string" || hostname === "") {
+    throw new Error(`Invalid host: ${hostname}`)
   }
   if (typeof port !== "number") {
     throw new Error(`Invalid port: ${port}`)
@@ -29,7 +32,7 @@ export function parse(argv: string[]): CLIOption {
   }
 
   return {
-    host,
+    hostname,
     port,
     storage,
   }
