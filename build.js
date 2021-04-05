@@ -1,38 +1,37 @@
 // @ts-check
 /// <reference lib="es2018" />
 
-const chokidar = require("chokidar")
 const esbuild = require("esbuild")
+const mri = require("mri")
 const path = require("path")
 
 async function run() {
-  const [watch] = process.argv.slice(2)
+  const { watch } = mri(process.argv.slice(2), {
+    boolean: ["watch"],
+  })
 
   try {
     const entryPoint = path.resolve(__dirname, "src/index.ts")
     const outfile = path.resolve(__dirname, "dist/index.js")
 
-    const buildSync = () => {
-      esbuild.buildSync({
-        charset: "utf8",
-        sourcemap: true,
-        bundle: true,
-        external: ["formidable", "mri"],
-        platform: "node",
-        target: "node10",
-        format: "cjs",
-        entryPoints: [entryPoint],
-        outfile,
-      })
-    }
-
-    if (watch) {
-      chokidar
-        .watch(path.join(__dirname, "src/**/*.{ts,tsx}"))
-        .on("all", buildSync)
-    } else {
-      buildSync()
-    }
+    await esbuild.build({
+      charset: "utf8",
+      sourcemap: true,
+      bundle: true,
+      external: ["formidable", "mri"],
+      platform: "node",
+      target: "node10",
+      format: "cjs",
+      entryPoints: [entryPoint],
+      outfile,
+      watch: watch
+        ? {
+            onRebuild() {
+              console.error(`[${new Date().toJSON()}] rebuild`)
+            },
+          }
+        : false,
+    })
   } catch (err) {
     console.error(err)
 

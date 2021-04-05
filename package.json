@@ -36,7 +36,6 @@
     "@types/formidable": "^1.2.1",
     "@types/mri": "^1.1.0",
     "@types/node": "10.x.x",
-    "chokidar": "^3.5.1",
     "esbuild": "^0.11.5",
     "prettier": "^2.2.1",
     "typescript": "^4.2.3"
