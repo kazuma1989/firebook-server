@@ -15,16 +15,14 @@ async function run() {
     const buildSync = () => {
       esbuild.buildSync({
         charset: "utf8",
-        bundle: false,
+        sourcemap: true,
+        bundle: true,
+        external: ["formidable", "mri"],
         platform: "node",
         target: "node10",
         format: "cjs",
         entryPoints: [entryPoint],
         outfile,
-        define: {
-          // Suppress warnings from Formidable.
-          "global.GENTLY": JSON.stringify(false),
-        },
       })
     }
 
