@@ -7,6 +7,8 @@ import { parse } from "./parse"
 import { createServer } from "./server"
 import { randomID } from "./util"
 
+const NULL = "null"
+
 /**
  * メインの処理。
  */
@@ -148,15 +150,15 @@ async function run() {
         }
       )
 
-      server.on(`POST /${key}` as "POST /key", (req, resp, { url }) => {
+      server.on(`POST /${key}` as "POST /key", async (req, resp, { url }) => {
         const badRequest = () => {
           resp.writeHead(400)
-          resp.end("null")
+          resp.end(NULL)
         }
 
         const serviceUnavailable = () => {
           resp.writeHead(503)
-          resp.end("null")
+          resp.end(NULL)
         }
 
         const [mimeType] =
@@ -167,47 +169,45 @@ async function run() {
         }
 
         const chunks: Buffer[] = []
-        req.on("data", (chunk: unknown) => {
+        for await (const chunk of req) {
           if (!(chunk instanceof Buffer)) {
             console.warn("chunk is not a buffer", util.inspect(chunk))
-            return
+            break
           }
 
           chunks.push(chunk)
-        })
+        }
 
-        req.once("end", async () => {
-          try {
-            const body = Buffer.concat(chunks).toString()
+        try {
+          const body = Buffer.concat(chunks).toString()
 
-            let item: {
-              id: string
-              [key: string]: unknown
-            }
-            try {
-              item = {
-                ...JSON.parse(body),
-                id: randomID(),
-              }
-            } catch (err) {
-              badRequest()
-              return
-            }
-
-            db[key]!.push(item)
-
-            await writer.write(JSON.stringify(db, null, 2) + "\n")
-
-            resp.writeHead(201, {
-              Location: `${url.toString()}/${item.id}`,
-            })
-            resp.end(stringify(item))
-          } catch (err) {
-            console.error(err)
-
-            serviceUnavailable()
+          let item: {
+            id: string
+            [key: string]: unknown
           }
-        })
+          try {
+            item = {
+              ...JSON.parse(body),
+              id: randomID(),
+            }
+          } catch (err) {
+            badRequest()
+            return
+          }
+
+          db[key]!.push(item)
+
+          await writer.write(JSON.stringify(db, null, 2) + "\n")
+
+          resp.writeHead(201, {
+            Location: `${url.toString()}/${item.id}`,
+          })
+          resp.end(stringify(item))
+        } catch (err) {
+          console.error(err)
+
+          serviceUnavailable()
+        }
       })
 
       server.on(
