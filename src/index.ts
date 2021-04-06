@@ -1,8 +1,11 @@
 import formidable from "formidable"
 import * as fs from "fs"
 import * as path from "path"
+import { Writer } from "steno"
+import * as util from "util"
 import { parse } from "./parse"
 import { createServer } from "./server"
+import { randomID } from "./util"
 
 /**
  * メインの処理。
@@ -119,9 +122,10 @@ async function run() {
     })
 
     //
-    const db = JSON.parse(
+    const db: Record<string, { id: string }[]> = JSON.parse(
       (await fs.promises.readFile(databaseFile)).toString()
-    ) as Record<string, { id: string }[]>
+    )
+    const writer = new Writer(databaseFile)
 
     Object.keys(db).forEach((key) => {
       if (!key.match(/^[A-Za-z0-9_-]+$/i)) return
@@ -144,15 +148,48 @@ async function run() {
         }
       )
 
-      server.on(`POST /${key}` as "POST /key", (req, resp, {}) => {
-        resp.writeHead(400)
-        resp.end("{}")
+      server.on(`POST /${key}` as "POST /key", (req, resp, { url }) => {
+        const chunks: Buffer[] = []
+        req.on("data", (chunk: unknown) => {
+          if (!(chunk instanceof Buffer)) {
+            console.warn("chunk is not a buffer", util.inspect(chunk))
+            return
+          }
+
+          chunks.push(chunk)
+        })
+
+        req.once("end", async () => {
+          try {
+            const body = Buffer.concat(chunks).toString()
+
+            const id = randomID()
+            const item = {
+              ...JSON.parse(body),
+              id,
+            }
+
+            db[key]!.push(item)
+
+            await writer.write(JSON.stringify(db, null, 2) + "\n")
+
+            resp.writeHead(201, {
+              Location: `${url.toString()}/${id}`,
+            })
+            resp.end(JSON.stringify(item))
+          } catch (err) {
+            console.error(err)
+
+            resp.writeHead(500)
+            resp.end('{"error":true}')
+          }
+        })
       })
 
       server.on(
         `PUT /${key}/(?<id>.+)` as "PUT /key/:id",
         (req, resp, { pathParam: { id } }) => {
-          resp.writeHead(400)
+          resp.writeHead(405)
           resp.end("{}")
         }
       )
@@ -160,7 +197,7 @@ async function run() {
       server.on(
         `PATCH /${key}/(?<id>.+)` as "PATCH /key/:id",
         (req, resp, { pathParam: { id } }) => {
-          resp.writeHead(400)
+          resp.writeHead(405)
           resp.end("{}")
         }
       )
@@ -168,7 +205,7 @@ async function run() {
       server.on(
         `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
         (req, resp, { pathParam: { id } }) => {
-          resp.writeHead(400)
+          resp.writeHead(405)
           resp.end("{}")
         }
       )
