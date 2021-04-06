@@ -21,7 +21,7 @@ async function run() {
       bundle: true,
       external: Object.keys(dependencies),
       platform: "node",
-      target: "node10",
+      target: "node10.0.0",
       format: "cjs",
       entryPoints: [entryPoint],
       outfile,
