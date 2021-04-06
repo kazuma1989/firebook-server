@@ -149,6 +149,23 @@ async function run() {
       )
 
       server.on(`POST /${key}` as "POST /key", (req, resp, { url }) => {
+        const badRequest = () => {
+          resp.writeHead(400)
+          resp.end("null")
+        }
+
+        const serviceUnavailable = () => {
+          resp.writeHead(503)
+          resp.end("null")
+        }
+
+        const [mimeType] =
+          req.headers["content-type"]?.split(";").map((v) => v.trim()) ?? []
+        if (mimeType !== "application/json") {
+          badRequest()
+          return
+        }
+
         const chunks: Buffer[] = []
         req.on("data", (chunk: unknown) => {
           if (!(chunk instanceof Buffer)) {
@@ -163,10 +180,18 @@ async function run() {
           try {
             const body = Buffer.concat(chunks).toString()
 
-            const id = randomID()
-            const item = {
-              ...JSON.parse(body),
-              id,
+            let item: {
+              id: string
+              [key: string]: unknown
+            }
+            try {
+              item = {
+                ...JSON.parse(body),
+                id: randomID(),
+              }
+            } catch (err) {
+              badRequest()
+              return
             }
 
             db[key]!.push(item)
@@ -174,14 +199,13 @@ async function run() {
             await writer.write(JSON.stringify(db, null, 2) + "\n")
 
             resp.writeHead(201, {
-              Location: `${url.toString()}/${id}`,
+              Location: `${url.toString()}/${item.id}`,
             })
-            resp.end(JSON.stringify(item))
+            resp.end(stringify(item))
           } catch (err) {
             console.error(err)
 
-            resp.writeHead(500)
-            resp.end('{"error":true}')
+            serviceUnavailable()
           }
         })
       })
