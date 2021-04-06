@@ -29,7 +29,12 @@ interface Route {
 
 interface Server extends http.Server {
   on(
-    event: `${METHODS} ${string}`,
+    event: "request",
+    listener: (req: http.IncomingMessage, resp: http.ServerResponse) => void
+  ): this
+
+  on<Event extends `${METHODS} ${string}`>(
+    event: Event,
     listener: (
       req: http.IncomingMessage,
       resp: http.ServerResponse,
@@ -37,10 +42,7 @@ interface Server extends http.Server {
     ) => void
   ): this
 
-  on(
-    event: "request",
-    listener: (req: http.IncomingMessage, resp: http.ServerResponse) => void
-  ): this
+  on(event: string, listener: (...args: unknown[]) => void): this
 
   on(event: string, listener: (...args: any[]) => void): this
 }
@@ -62,81 +64,94 @@ interface Server extends http.Server {
  * })
  */
 export function createServer(): Server {
-  return http.createServer().once("listening", function setup(this: Server) {
-    const routes = this.eventNames()
-      .filter(
-        (eventName): eventName is `${METHODS} ${string}` =>
-          typeof eventName === "string" &&
-          METHODS.some((method) => eventName.startsWith(`${method} `))
-      )
-      .map((eventName) => {
-        const [method, rawPathPattern] = eventName.split(" ", 2) as [
-          METHODS,
-          string
-        ]
+  class JSONResponse extends http.ServerResponse {
+    constructor(req: http.IncomingMessage) {
+      super(req)
 
-        return {
-          eventName,
-          method,
-          rawPathPattern,
-          pathPattern: new RegExp(`^${rawPathPattern}$`, "i"),
+      this.setHeader("Content-Type", "application/json")
+    }
+  }
+
+  return http
+    .createServer({
+      IncomingMessage: http.IncomingMessage,
+      ServerResponse: JSONResponse,
+    })
+    .once("listening", function setup(this: Server) {
+      const routes = this.eventNames()
+        .filter(
+          (eventName): eventName is `${METHODS} ${string}` =>
+            typeof eventName === "string" &&
+            METHODS.some((method) => eventName.startsWith(`${method} `))
+        )
+        .map((eventName) => {
+          const [method, rawPathPattern] = eventName.split(" ", 2) as [
+            METHODS,
+            string
+          ]
+
+          return {
+            eventName,
+            method,
+            rawPathPattern,
+            pathPattern: new RegExp(`^${rawPathPattern}$`, "i"),
+          }
+        })
+
+      this.on("request", (req, resp) => {
+        const notFound = () => {
+          resp.writeHead(404)
+          resp.end()
         }
-      })
 
-    this.on("request", (req, resp) => {
-      const notFound = () => {
-        resp.writeHead(404)
-        resp.end()
-      }
+        const badRequest = () => {
+          resp.writeHead(400)
+          resp.end()
+        }
 
-      const badRequest = () => {
-        resp.writeHead(400)
-        resp.end()
-      }
-
-      if (!req.method || !req.url) {
-        badRequest()
-        return
-      }
-
-      const normalized = {
-        method: req.method?.toUpperCase(),
-        url: path.posix.normalize(req.url),
-      }
-
-      let route: Route | undefined
-      for (let i = 0; i < routes.length; i++) {
-        const { eventName, method, rawPathPattern, pathPattern } = routes[i]!
-        if (normalized.method !== method) continue
-
-        let url: URL
-        try {
-          url = new URL(normalized.url, `http://${req.headers.host}`)
-        } catch (err) {
+        if (!req.method || !req.url) {
           badRequest()
           return
         }
 
-        const match = url.pathname.match(pathPattern)
-        if (!match) continue
-
-        route = {
-          eventName,
-          method,
-          rawPathPattern,
-          pathPattern,
-          url,
-          pathParam: match.groups ?? {},
+        const normalized = {
+          method: req.method?.toUpperCase(),
+          url: path.posix.normalize(req.url),
         }
-        break
-      }
 
-      if (!route) {
-        notFound()
-        return
-      }
+        let route: Route | undefined
+        for (let i = 0; i < routes.length; i++) {
+          const { eventName, method, rawPathPattern, pathPattern } = routes[i]!
+          if (normalized.method !== method) continue
 
-      this.emit(route.eventName, req, resp, route)
+          let url: URL
+          try {
+            url = new URL(normalized.url, `http://${req.headers.host}`)
+          } catch (err) {
+            badRequest()
+            return
+          }
+
+          const match = url.pathname.match(pathPattern)
+          if (!match) continue
+
+          route = {
+            eventName,
+            method,
+            rawPathPattern,
+            pathPattern,
+            url,
+            pathParam: match.groups ?? {},
+          }
+          break
+        }
+
+        if (!route) {
+          notFound()
+          return
+        }
+
+        this.emit(route.eventName, req, resp, route)
+      })
     })
-  })
 }

@@ -1,23 +1,33 @@
 import mri from "mri"
 
 interface CLIOption {
+  /** @default "localhost" */
   hostname: string
+
+  /** @default 5000 */
   port: number
+
+  /** @default "storage" */
   storage: string
+
+  /** @default "db.json" */
+  database: string
 }
 
 /**
  * CLI 引数をパースする。
  */
 export function parse(argv: string[]): CLIOption {
-  const { host: hostname, port, storage } = mri(argv, {
+  const { hostname, port, storage, database } = mri(argv, {
     default: {
       hostname: "localhost",
       port: 5000,
       storage: "storage",
+      database: "db.json",
     },
     alias: {
       hostname: ["host"],
+      database: ["db"],
     },
   }) as mri.DictionaryObject<unknown>
 
@@ -30,10 +40,14 @@ export function parse(argv: string[]): CLIOption {
   if (typeof storage !== "string") {
     throw new Error(`Invalid storage: ${storage}`)
   }
+  if (typeof database !== "string") {
+    throw new Error(`Invalid database: ${database}`)
+  }
 
   return {
     hostname,
     port,
     storage,
+    database,
   }
 }

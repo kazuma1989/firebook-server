@@ -8,14 +8,20 @@ import { createServer } from "./server"
  * メインの処理。
  */
 async function run() {
+  const stringify = (value: any) => {
+    return JSON.stringify(value, null, 4)
+  }
+
   try {
     const option = parse(process.argv.slice(2))
+
     const storageDir = path.resolve(process.cwd(), option.storage)
+    const databaseFile = path.resolve(process.cwd(), option.database)
 
     const server = createServer()
 
     server.on("request", (req, resp) => {
-      console.log("request", req.url)
+      console.log("request", req.method, req.url)
     })
 
     // 開発サーバーなので緩い制約で CORS を受け入れる。
@@ -105,11 +111,67 @@ async function run() {
           "Content-Type": "application/json",
         })
         resp.end(
-          JSON.stringify({
+          stringify({
             downloadURL: `${origin}/storage/${path.basename(file.path)}`,
           })
         )
       })
+    })
+
+    //
+    const db = JSON.parse(
+      (await fs.promises.readFile(databaseFile)).toString()
+    ) as Record<string, { id: string }[]>
+
+    Object.keys(db).forEach((key) => {
+      if (!key.match(/^[A-Za-z0-9_-]+$/i)) return
+
+      server.on(`GET /${key}` as "GET /key", (req, resp, {}) => {
+        resp.end(stringify(db[key]!))
+      })
+
+      server.on(
+        `GET /${key}/(?<id>.+)` as "GET /key/:id",
+        (req, resp, { pathParam: { id } }) => {
+          const item = db[key]!.find((v) => v.id === id)
+          if (!item) {
+            resp.writeHead(404)
+            resp.end("{}")
+            return
+          }
+
+          resp.end(stringify(item))
+        }
+      )
+
+      server.on(`POST /${key}` as "POST /key", (req, resp, {}) => {
+        resp.writeHead(400)
+        resp.end("{}")
+      })
+
+      server.on(
+        `PUT /${key}/(?<id>.+)` as "PUT /key/:id",
+        (req, resp, { pathParam: { id } }) => {
+          resp.writeHead(400)
+          resp.end("{}")
+        }
+      )
+
+      server.on(
+        `PATCH /${key}/(?<id>.+)` as "PATCH /key/:id",
+        (req, resp, { pathParam: { id } }) => {
+          resp.writeHead(400)
+          resp.end("{}")
+        }
+      )
+
+      server.on(
+        `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
+        (req, resp, { pathParam: { id } }) => {
+          resp.writeHead(400)
+          resp.end("{}")
+        }
+      )
     })
 
     server.listen(option.port, option.hostname, () => {
