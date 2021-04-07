@@ -1,10 +1,10 @@
 /**
- * ランダムな ID `[0-9A-Za-z_-]{12}` を作成する。
+ * ランダムな ID `[0-9A-Za-z_]{12}` を作成する。
  * 暗号学的強度はないので本格的な利用には耐えない。
  */
 export function randomID() {
   const alphabet =
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz-"
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
 
   let id = ""
   for (let i = 12; i > 0; i--) {
