@@ -284,9 +284,22 @@ async function run() {
 
       server.on(
         `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
-        (req, resp, { pathParam: { id } }) => {
-          resp.endAs("405 Method Not Allowed")
-          return
+        async (req, resp, { pathParam: { id } }) => {
+          try {
+            const index = db[key]!.findIndex((v) => v.id === id)
+            const exists = index !== -1
+            if (exists) {
+              db[key]!.splice(index, 1)
+            }
+
+            await writer.write(JSON.stringify(db, null, 2) + "\n")
+
+            resp.endAs("200 OK")
+          } catch (err) {
+            console.error(err)
+
+            resp.endAs("503 Service Unavailable")
+          }
         }
       )
     })

@@ -129,11 +129,14 @@ class JSONResponse extends http.ServerResponse {
   }
 
   /**
+   * `null` という文字列（JSON として解釈可能）を返す。
+   *
    * @param status
    * @param message デフォルト以外のステータスメッセージにしたいときは指定する。
    */
   endAs(
     status:
+      | "200 OK"
       | "400 Bad Request"
       | "404 Not Found"
       | "405 Method Not Allowed"
