@@ -25,8 +25,18 @@ async function run() {
 
     const server = createServer()
 
+    // ロギング
     server.on("request", (req, resp) => {
       console.log("request", req.method, req.url)
+
+      req.on("warn", (info) => {
+        switch (info.type) {
+          case "warn/chunk-is-not-a-buffer": {
+            console.warn(info.message, util.inspect(info.payload))
+            break
+          }
+        }
+      })
     })
 
     // 開発サーバーなので緩い制約で CORS を受け入れる。
@@ -39,20 +49,8 @@ async function run() {
     server.on(
       "GET /storage/(?<file>.+)",
       (req, resp, { pathParam: { file } }) => {
-        console.debug("file", file)
-
-        const notFound = () => {
-          resp.writeHead(404)
-          resp.end()
-        }
-
-        const internalError = () => {
-          resp.writeHead(500)
-          resp.end()
-        }
-
         if (!file) {
-          notFound()
+          resp.endAs("404 Not Found")
           return
         }
 
@@ -66,7 +64,9 @@ async function run() {
         const filePath = path.join(storageDir, path.normalize(file))
 
         fs.createReadStream(filePath)
-          .on("error", notFound)
+          .on("error", () => {
+            resp.endAs("404 Not Found")
+          })
           .once("open", () => {
             resp.setHeader(
               "Content-Type",
@@ -78,17 +78,16 @@ async function run() {
           .on("finish", () => {
             resp.end()
           })
-          .on("error", internalError)
+          .on("error", (err) => {
+            console.error(err)
+
+            resp.endAs("503 Service Unavailable")
+          })
       }
     )
 
     // ファイルアップロードのエンドポイント。
     server.on("POST /storage", (req, resp) => {
-      const badRequest = () => {
-        resp.writeHead(400)
-        resp.end()
-      }
-
       const form = new formidable.IncomingForm({
         uploadDir: storageDir,
         keepExtensions: true,
@@ -98,13 +97,13 @@ async function run() {
         if (err) {
           console.error("error", err)
 
-          badRequest()
+          resp.endAs("400 Bad Request")
           return
         }
 
         const [file] = Object.values(files)
         if (!file || Array.isArray(file)) {
-          badRequest()
+          resp.endAs("400 Bad Request")
           return
         }
 
@@ -141,8 +140,7 @@ async function run() {
         (req, resp, { pathParam: { id } }) => {
           const item = db[key]!.find((v) => v.id === id)
           if (!item) {
-            resp.writeHead(404)
-            resp.end("{}")
+            resp.endAs("404 Not Found")
             return
           }
 
@@ -151,48 +149,24 @@ async function run() {
       )
 
       server.on(`POST /${key}` as "POST /key", async (req, resp, { url }) => {
-        const badRequest = () => {
-          resp.writeHead(400)
-          resp.end(NULL)
-        }
-
-        const serviceUnavailable = () => {
-          resp.writeHead(503)
-          resp.end(NULL)
-        }
-
-        const [mimeType] =
-          req.headers["content-type"]?.split(";").map((v) => v.trim()) ?? []
-        if (mimeType !== "application/json") {
-          badRequest()
+        if (req.mimeType !== "application/json") {
+          resp.endAs(
+            "400 Bad Request",
+            `Content-Type is not "application/json"`
+          )
           return
         }
 
-        const chunks: Buffer[] = []
-        for await (const chunk of req) {
-          if (!(chunk instanceof Buffer)) {
-            console.warn("chunk is not a buffer", util.inspect(chunk))
-            break
-          }
-
-          chunks.push(chunk)
+        const body = await req.parseBodyAsJSONObject().catch(() => null)
+        if (!body) {
+          resp.endAs("400 Bad Request", "Malformed JSON input")
+          return
         }
 
         try {
-          const body = Buffer.concat(chunks).toString()
-
-          let item: {
-            id: string
-            [key: string]: unknown
-          }
-          try {
-            item = {
-              ...JSON.parse(body),
-              id: randomID(),
-            }
-          } catch (err) {
-            badRequest()
-            return
+          const item = {
+            ...body,
+            id: randomID(),
           }
 
           db[key]!.push(item)
@@ -206,7 +180,7 @@ async function run() {
         } catch (err) {
           console.error(err)
 
-          serviceUnavailable()
+          resp.endAs("503 Service Unavailable")
         }
       })
 
