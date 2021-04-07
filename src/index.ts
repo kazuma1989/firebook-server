@@ -3,7 +3,7 @@ import * as fs from "fs"
 import * as path from "path"
 import { Writer } from "steno"
 import * as util from "util"
-import { parse } from "./parse"
+import { helpMessage, parse } from "./parse"
 import { createServer } from "./server"
 import { randomID } from "./util"
 
@@ -17,6 +17,14 @@ async function run() {
 
   try {
     const option = parse(process.argv.slice(2))
+    if (option.help) {
+      console.log(helpMessage)
+      return
+    }
+    if (option.version) {
+      console.log(PACKAGE_VERSION)
+      return
+    }
 
     const storageDir = path.resolve(process.cwd(), option.storage)
     const databaseFile = path.resolve(process.cwd(), option.database)
