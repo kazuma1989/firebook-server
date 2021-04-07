@@ -18,7 +18,12 @@ interface CLIOption {
  * CLI 引数をパースする。
  */
 export function parse(argv: string[]): CLIOption {
-  const { hostname, port, storage, database } = mri(argv, {
+  const {
+    hostname,
+    port,
+    storage,
+    database,
+  }: mri.DictionaryObject<unknown> = mri(argv, {
     default: {
       hostname: "localhost",
       port: 5000,
@@ -29,7 +34,7 @@ export function parse(argv: string[]): CLIOption {
       hostname: ["host"],
       database: ["db"],
     },
-  }) as mri.DictionaryObject<unknown>
+  })
 
   if (typeof hostname !== "string" || hostname === "") {
     throw new Error(`Invalid host: ${hostname}`)
