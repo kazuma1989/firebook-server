@@ -12,7 +12,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=10.24.0"
+    "node": ">=10.0.0"
   },
   "files": [
     "dist/index.js"
@@ -24,11 +24,13 @@
   },
   "dependencies": {
     "formidable": "^1.2.2",
-    "mri": "^1.1.6"
+    "mri": "^1.1.6",
+    "steno": "^1.0.0"
   },
   "bundledDependencies": [
     "formidable",
-    "mri"
+    "mri",
+    "steno"
   ],
   "devDependencies": {
     "@types/formidable": "^1.2.1",
