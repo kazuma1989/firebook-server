@@ -236,9 +236,49 @@ async function run() {
 
       server.on(
         `PATCH /${key}/(?<id>.+)` as "PATCH /key/:id",
-        (req, resp, { pathParam: { id } }) => {
-          resp.endAs("405 Method Not Allowed")
-          return
+        async (req, resp, { url, pathParam: { id } }) => {
+          if (!id) {
+            resp.endAs("405 Method Not Allowed")
+            return
+          }
+
+          if (req.mimeType !== "application/json") {
+            resp.endAs(
+              "400 Bad Request",
+              `Content-Type is not "application/json"`
+            )
+            return
+          }
+
+          const body = await req.parseBodyAsJSONObject().catch(() => null)
+          if (!body) {
+            resp.endAs("400 Bad Request", "Malformed JSON input")
+            return
+          }
+
+          try {
+            const item = db[key]!.find((v) => v.id === id)
+            if (!item) {
+              resp.endAs("404 Not Found")
+              return
+            }
+
+            Object.assign(item, {
+              ...body,
+              id,
+            })
+
+            await writer.write(JSON.stringify(db, null, 2) + "\n")
+
+            resp.writeHead(200, {
+              Location: url.toString(),
+            })
+            resp.end(stringify(item))
+          } catch (err) {
+            console.error(err)
+
+            resp.endAs("503 Service Unavailable")
+          }
         }
       )
 
