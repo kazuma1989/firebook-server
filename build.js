@@ -5,20 +5,21 @@ const esbuild = require("esbuild")
 const mri = require("mri")
 const path = require("path")
 const semver = require("semver")
-const { engines, dependencies } = require("./package.json")
+const { bin, dependencies, engines } = require("./package.json")
 
 async function run() {
-  const { watch } = mri(process.argv.slice(2), {
-    boolean: ["watch"],
-  })
-
   try {
+    const { watch } = mri(process.argv.slice(2), {
+      boolean: ["watch"],
+    })
+
     const entryPoint = path.resolve(__dirname, "src/index.ts")
-    const outfile = path.resolve(__dirname, "dist/index.js")
+    const outfile = path.resolve(__dirname, bin)
 
     await esbuild.build({
       charset: "utf8",
       sourcemap: true,
+      sourcesContent: false,
       bundle: true,
       external: Object.keys(dependencies),
       platform: "node",
