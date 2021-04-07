@@ -131,10 +131,12 @@ async function run() {
     Object.keys(db).forEach((key) => {
       if (!key.match(/^[A-Za-z0-9_-]+$/i)) return
 
+      // GET all
       server.on(`GET /${key}` as "GET /key", (req, resp, {}) => {
         resp.end(stringify(db[key]!))
       })
 
+      // GET single
       server.on(
         `GET /${key}/(?<id>.+)` as "GET /key/:id",
         (req, resp, { pathParam: { id } }) => {
@@ -148,6 +150,7 @@ async function run() {
         }
       )
 
+      // POST
       server.on(`POST /${key}` as "POST /key", async (req, resp, { url }) => {
         if (req.mimeType !== "application/json") {
           resp.endAs(
@@ -184,6 +187,7 @@ async function run() {
         }
       })
 
+      // PUT
       server.on(
         `PUT /${key}/(?<id>.+)` as "PUT /key/:id",
         async (req, resp, { url, pathParam: { id } }) => {
@@ -234,6 +238,7 @@ async function run() {
         }
       )
 
+      // PATCH
       server.on(
         `PATCH /${key}/(?<id>.+)` as "PATCH /key/:id",
         async (req, resp, { url, pathParam: { id } }) => {
@@ -282,6 +287,7 @@ async function run() {
         }
       )
 
+      // DELETE
       server.on(
         `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
         async (req, resp, { pathParam: { id } }) => {
