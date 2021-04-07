@@ -4,7 +4,8 @@
 const esbuild = require("esbuild")
 const mri = require("mri")
 const path = require("path")
-const { dependencies } = require("./package.json")
+const semver = require("semver")
+const { engines, dependencies } = require("./package.json")
 
 async function run() {
   const { watch } = mri(process.argv.slice(2), {
@@ -21,7 +22,7 @@ async function run() {
       bundle: true,
       external: Object.keys(dependencies),
       platform: "node",
-      target: "node10.1.0",
+      target: `node${semver.minVersion(engines.node)}`,
       format: "cjs",
       entryPoints: [entryPoint],
       outfile,
