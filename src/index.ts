@@ -7,8 +7,6 @@ import { parse } from "./parse"
 import { createServer } from "./server"
 import { randomID } from "./util"
 
-const NULL = "null"
-
 /**
  * メインの処理。
  */
