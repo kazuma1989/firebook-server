@@ -5,7 +5,7 @@ const esbuild = require("esbuild")
 const mri = require("mri")
 const path = require("path")
 const semver = require("semver")
-const { bin, dependencies, engines } = require("./package.json")
+const { bin, dependencies, engines, name, version } = require("./package.json")
 
 async function run() {
   try {
@@ -27,6 +27,10 @@ async function run() {
       format: "cjs",
       entryPoints: [entryPoint],
       outfile,
+      define: {
+        PACKAGE_NAME: JSON.stringify(name),
+        PACKAGE_VERSION: JSON.stringify(version),
+      },
       banner: {
         js: "#!/usr/bin/env node",
       },

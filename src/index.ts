@@ -309,9 +309,8 @@ async function run() {
     })
 
     server.listen(option.port, option.hostname, () => {
-      console.log(
-        `Server is listening at http://${option.hostname}:${option.port}`
-      )
+      console.log(`${PACKAGE_NAME} v${PACKAGE_VERSION}`)
+      console.log(`http://${option.hostname}:${option.port}`)
     })
   } catch (err) {
     console.error(err)
