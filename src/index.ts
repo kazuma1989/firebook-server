@@ -186,25 +186,67 @@ async function run() {
 
       server.on(
         `PUT /${key}/(?<id>.+)` as "PUT /key/:id",
-        (req, resp, { pathParam: { id } }) => {
-          resp.writeHead(405)
-          resp.end("{}")
+        async (req, resp, { url, pathParam: { id } }) => {
+          if (!id) {
+            resp.endAs("405 Method Not Allowed")
+            return
+          }
+
+          if (req.mimeType !== "application/json") {
+            resp.endAs(
+              "400 Bad Request",
+              `Content-Type is not "application/json"`
+            )
+            return
+          }
+
+          const body = await req.parseBodyAsJSONObject().catch(() => null)
+          if (!body) {
+            resp.endAs("400 Bad Request", "Malformed JSON input")
+            return
+          }
+
+          try {
+            const item = {
+              ...body,
+              id,
+            }
+
+            const index = db[key]!.findIndex((v) => v.id === item.id)
+            const exists = index !== -1
+            if (exists) {
+              db[key]!.splice(index, 1, item)
+            } else {
+              db[key]!.push(item)
+            }
+
+            await writer.write(JSON.stringify(db, null, 2) + "\n")
+
+            resp.writeHead(exists ? 200 : 201, {
+              Location: url.toString(),
+            })
+            resp.end(stringify(item))
+          } catch (err) {
+            console.error(err)
+
+            resp.endAs("503 Service Unavailable")
+          }
         }
       )
 
       server.on(
         `PATCH /${key}/(?<id>.+)` as "PATCH /key/:id",
         (req, resp, { pathParam: { id } }) => {
-          resp.writeHead(405)
-          resp.end("{}")
+          resp.endAs("405 Method Not Allowed")
+          return
         }
       )
 
       server.on(
         `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
         (req, resp, { pathParam: { id } }) => {
-          resp.writeHead(405)
-          resp.end("{}")
+          resp.endAs("405 Method Not Allowed")
+          return
         }
       )
     })

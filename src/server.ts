@@ -128,11 +128,19 @@ class JSONResponse extends http.ServerResponse {
     this.setHeader("Content-Type", "application/json")
   }
 
+  /**
+   * @param status
+   * @param message デフォルト以外のステータスメッセージにしたいときは指定する。
+   */
   endAs(
-    status: "400 Bad Request" | "404 Not Found" | "503 Service Unavailable",
+    status:
+      | "400 Bad Request"
+      | "404 Not Found"
+      | "405 Method Not Allowed"
+      | "503 Service Unavailable",
     message?: string
   ): void {
-    const statusCode = parseInt(status.split(" ")[0]!)
+    const statusCode = parseInt(status.split(" ")[0]!) || 500
 
     if (message) {
       this.statusMessage = message
