@@ -34,7 +34,8 @@
 
     // null/undefined になる可能性のある変数を教えてくれる。
     "strictNullChecks": true,
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "strictPropertyInitialization": true
   },
 
   // src フォルダーだけを対象にする。

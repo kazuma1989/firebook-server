@@ -49,7 +49,7 @@ class JSONRequest extends http.IncomingMessage {
   mimeType?: string
 
   /** @example ["charset=utf-8"] */
-  parameters: string[]
+  parameters?: string[]
 
   constructor(socket: import("net").Socket) {
     super(socket)

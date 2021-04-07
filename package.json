@@ -20,7 +20,8 @@
   "bin": "dist/index.js",
   "scripts": {
     "watch": "node build --watch",
-    "prepack": "node build"
+    "prepack": "node build",
+    "test": "uvu -r esbuild-register src \".+\\.test\\.ts\""
   },
   "dependencies": {
     "formidable": "^1.2.2",
