@@ -25,7 +25,7 @@ async function run() {
 
     // ロギング
     server.on("request", (req, resp) => {
-      console.log(req.method, req.url)
+      console.log(`[${new Date().toJSON()}]`, req.method, req.url)
 
       req.on("warn", (info) => {
         switch (info.type) {
