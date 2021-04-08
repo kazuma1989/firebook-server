@@ -1,6 +1,5 @@
 import * as http from "http"
 import * as path from "path"
-import { URL } from "url"
 
 const METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"] as const
 type METHODS = typeof METHODS[number]

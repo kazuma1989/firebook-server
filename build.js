@@ -27,6 +27,7 @@ async function run() {
       format: "cjs",
       entryPoints: [entryPoint],
       outfile,
+      // see define.d.ts
       define: {
         PACKAGE_NAME: JSON.stringify(name),
         PACKAGE_VERSION: JSON.stringify(version),
