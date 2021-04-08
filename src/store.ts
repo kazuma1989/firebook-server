@@ -1,6 +1,6 @@
 import { EventEmitter } from "events"
 
-export class Store<S = any, A extends Action = Action> {
+export class Store<S = unknown, A extends Action = Action> {
   private emitter = new EventEmitter()
 
   constructor(reducer: Reducer<S, A>, private state: S) {
