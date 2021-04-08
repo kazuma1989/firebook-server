@@ -25,6 +25,15 @@ type RestAction =
       }
     }
   | {
+      type: "PATCH /post/:id"
+      payload: {
+        id: string
+        body: {
+          [key: string]: unknown
+        }
+      }
+    }
+  | {
       type: "DELETE /post"
       payload: {
         id: string
@@ -52,9 +61,37 @@ export function reducer(state: DB, action: RestAction): DB {
       }
     }
 
+    case "PATCH /post/:id": {
+      const { posts } = state
+      const { id, body } = action.payload
+
+      if (!posts) {
+        return state
+      }
+
+      return {
+        ...state,
+        posts: posts.map((p) => {
+          if (p.id !== id) {
+            return p
+          }
+
+          return {
+            ...p,
+            ...body,
+            id,
+          }
+        }),
+      }
+    }
+
     case "DELETE /post": {
-      const { posts = [] } = state
+      const { posts } = state
       const { id } = action.payload
+
+      if (!posts) {
+        return state
+      }
 
       return {
         ...state,

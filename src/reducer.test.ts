@@ -6,6 +6,7 @@ import { Store } from "./store"
 const test = {
   "POST /post": suite("POST /post"),
   "PUT /post/:id": suite("PUT /post/:id"),
+  "PATCH /post/:id": suite("PATCH /post/:id"),
   "DELETE /post/:id": suite("DELETE /post/:id"),
 }
 
@@ -141,6 +142,85 @@ test["PUT /post/:id"]("ボディの id は無視する", async () => {
       { id: "a", text: "A" },
       { id: "b", text: "B" },
       { id: "c", text: "C" },
+    ],
+  })
+})
+
+test["PATCH /post/:id"]("オブジェクトの一部を書き換えられる", async () => {
+  const store = new Store(reducer, {
+    posts: [
+      { id: "a", text: "A", foo: false },
+      { id: "b", text: "B", foo: false },
+    ],
+  })
+
+  store.dispatch({
+    type: "PATCH /post/:id",
+    payload: {
+      id: "a",
+      body: {
+        text: "AAA",
+      },
+    },
+  })
+
+  assert.deepStrictEqual(store.getState(), {
+    posts: [
+      { id: "a", text: "AAA", foo: false },
+      { id: "b", text: "B", foo: false },
+    ],
+  })
+})
+
+test["PATCH /post/:id"]("id は変えられない", async () => {
+  const store = new Store(reducer, {
+    posts: [
+      { id: "a", text: "A" },
+      { id: "b", text: "B" },
+    ],
+  })
+
+  store.dispatch({
+    type: "PATCH /post/:id",
+    payload: {
+      id: "a",
+      body: {
+        id: "d",
+        foo: false,
+      },
+    },
+  })
+
+  assert.deepStrictEqual(store.getState(), {
+    posts: [
+      { id: "a", text: "A", foo: false },
+      { id: "b", text: "B" },
+    ],
+  })
+})
+
+test["PATCH /post/:id"]("存在しない id は無視する", async () => {
+  const store = new Store(reducer, {
+    posts: [
+      { id: "a", text: "A" },
+      { id: "b", text: "B" },
+    ],
+  })
+
+  store.dispatch({
+    type: "PATCH /post/:id",
+    payload: {
+      id: "c",
+      body: {
+        text: "C",
+      },
+    },
+  })
+
+  assert.deepStrictEqual(store.getState(), {
+    posts: [
+      { id: "a", text: "A" },
+      { id: "b", text: "B" },
     ],
   })
 })
