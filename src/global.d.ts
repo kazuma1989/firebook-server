@@ -1,4 +1,6 @@
-const URL: import("url")
-type URL = typeof URL
+import * as url from "url";
 
-const URLSearchParams: import("url").URLSearchParams
+declare global {
+  class URL extends url.URL {}
+  class URLSearchParams extends url.URLSearchParams {}
+}
