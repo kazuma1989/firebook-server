@@ -1,9 +1,9 @@
+export interface DB extends Record<string, Entry[]> {}
+
 interface Entry {
   id: string
   [key: string]: unknown
 }
-
-interface DB extends Record<string, Entry[]> {}
 
 type RestAction =
   | {

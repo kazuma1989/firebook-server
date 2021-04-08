@@ -241,7 +241,14 @@ export function createServer(): Server<JSONRequest, JSONResponse> {
         }
 
         req.detectMimeTypeAndParameters()
-        this.emit(route.eventName, req, resp, route)
+
+        try {
+          this.emit(route.eventName, req, resp, route)
+        } catch (err) {
+          console.error(err)
+
+          resp.endAs("503 Service Unavailable")
+        }
       })
     })
 }

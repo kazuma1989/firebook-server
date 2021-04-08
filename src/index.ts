@@ -4,17 +4,15 @@ import * as path from "path"
 import { Writer } from "steno"
 import * as util from "util"
 import { helpMessage, parse } from "./parse"
+import { DB, reducer } from "./reducer"
 import { createServer } from "./server"
+import { Store } from "./store"
 import { randomID } from "./util"
 
 /**
  * メインの処理。
  */
 async function run() {
-  const stringify = (value: any) => {
-    return JSON.stringify(value, null, 4)
-  }
-
   try {
     const option = parse(process.argv.slice(2))
     if (option.help) {
@@ -24,6 +22,10 @@ async function run() {
     if (option.version) {
       console.log(PACKAGE_VERSION)
       return
+    }
+
+    const stringify = (value: any) => {
+      return JSON.stringify(value, null, 4)
     }
 
     const storageDir = path.resolve(process.cwd(), option.storage)
@@ -129,24 +131,36 @@ async function run() {
     })
 
     //
-    const db: Record<string, { id: string }[]> = JSON.parse(
-      (await fs.promises.readFile(databaseFile)).toString()
+    const store = new Store(
+      reducer,
+      JSON.parse((await fs.promises.readFile(databaseFile)).toString()) as DB
     )
-    const writer = new Writer(databaseFile)
 
-    Object.keys(db).forEach((key) => {
+    const writer = new Writer(databaseFile)
+    const write = async () => {
+      await writer.write(JSON.stringify(store.getState(), null, 2) + "\n")
+    }
+
+    //
+    Object.keys(store.getState()).forEach((key) => {
       if (!key.match(/^[A-Za-z0-9_-]+$/i)) return
 
       // GET all
       server.on(`GET /${key}` as "GET /key", (req, resp, {}) => {
-        resp.end(stringify(db[key]!))
+        const items = store.getState()[key]
+        if (!items) {
+          resp.endAs("404 Not Found")
+          return
+        }
+
+        resp.end(stringify(items))
       })
 
       // GET single
       server.on(
         `GET /${key}/(?<id>.+)` as "GET /key/:id",
         (req, resp, { pathParam: { id } }) => {
-          const item = db[key]!.find((v) => v.id === id)
+          const item = store.getState()[key]?.find((v) => v.id === id)
           if (!item) {
             resp.endAs("404 Not Found")
             return
@@ -172,25 +186,29 @@ async function run() {
           return
         }
 
-        try {
-          const item = {
-            ...body,
-            id: randomID(),
-          }
+        const id = randomID()
 
-          db[key]!.push(item)
+        store.dispatch({
+          type: "POST /key",
+          payload: {
+            key,
+            id,
+            body,
+          },
+        })
 
-          await writer.write(JSON.stringify(db, null, 2) + "\n")
-
-          resp.writeHead(201, {
-            Location: `${url.toString()}/${item.id}`,
-          })
-          resp.end(stringify(item))
-        } catch (err) {
-          console.error(err)
-
-          resp.endAs("503 Service Unavailable")
+        const item = store.getState()[key]?.find((i) => i.id === id)
+        if (!item) {
+          resp.endAs("404 Not Found")
+          return
         }
+
+        await write()
+
+        resp.writeHead(201, {
+          Location: `${url.toString()}/${item.id}`,
+        })
+        resp.end(stringify(item))
       })
 
       // PUT
@@ -198,7 +216,7 @@ async function run() {
         `PUT /${key}/(?<id>.+)` as "PUT /key/:id",
         async (req, resp, { url, pathParam: { id } }) => {
           if (!id) {
-            resp.endAs("405 Method Not Allowed")
+            resp.endAs("400 Bad Request", "ID is required in path")
             return
           }
 
@@ -216,31 +234,27 @@ async function run() {
             return
           }
 
-          try {
-            const item = {
-              ...body,
+          store.dispatch({
+            type: "PUT /key/:id",
+            payload: {
+              key,
               id,
-            }
+              body,
+            },
+          })
 
-            const index = db[key]!.findIndex((v) => v.id === item.id)
-            const exists = index !== -1
-            if (exists) {
-              db[key]!.splice(index, 1, item)
-            } else {
-              db[key]!.push(item)
-            }
-
-            await writer.write(JSON.stringify(db, null, 2) + "\n")
-
-            resp.writeHead(exists ? 200 : 201, {
-              Location: url.toString(),
-            })
-            resp.end(stringify(item))
-          } catch (err) {
-            console.error(err)
-
-            resp.endAs("503 Service Unavailable")
+          const item = store.getState()[key]?.find((i) => i.id === id)
+          if (!item) {
+            resp.endAs("404 Not Found")
+            return
           }
+
+          await write()
+
+          resp.writeHead(200, {
+            Location: url.toString(),
+          })
+          resp.end(stringify(item))
         }
       )
 
@@ -249,7 +263,7 @@ async function run() {
         `PATCH /${key}/(?<id>.+)` as "PATCH /key/:id",
         async (req, resp, { url, pathParam: { id } }) => {
           if (!id) {
-            resp.endAs("405 Method Not Allowed")
+            resp.endAs("400 Bad Request", "ID is required in path")
             return
           }
 
@@ -267,29 +281,27 @@ async function run() {
             return
           }
 
-          try {
-            const item = db[key]!.find((v) => v.id === id)
-            if (!item) {
-              resp.endAs("404 Not Found")
-              return
-            }
-
-            Object.assign(item, {
-              ...body,
+          store.dispatch({
+            type: "PATCH /key/:id",
+            payload: {
+              key,
               id,
-            })
+              body,
+            },
+          })
 
-            await writer.write(JSON.stringify(db, null, 2) + "\n")
-
-            resp.writeHead(200, {
-              Location: url.toString(),
-            })
-            resp.end(stringify(item))
-          } catch (err) {
-            console.error(err)
-
-            resp.endAs("503 Service Unavailable")
+          const item = store.getState()[key]?.find((i) => i.id === id)
+          if (!item) {
+            resp.endAs("404 Not Found")
+            return
           }
+
+          await write()
+
+          resp.writeHead(200, {
+            Location: url.toString(),
+          })
+          resp.end(stringify(item))
         }
       )
 
@@ -297,25 +309,27 @@ async function run() {
       server.on(
         `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
         async (req, resp, { pathParam: { id } }) => {
-          try {
-            const index = db[key]!.findIndex((v) => v.id === id)
-            const exists = index !== -1
-            if (exists) {
-              db[key]!.splice(index, 1)
-            }
-
-            await writer.write(JSON.stringify(db, null, 2) + "\n")
-
-            resp.endAs("200 OK")
-          } catch (err) {
-            console.error(err)
-
-            resp.endAs("503 Service Unavailable")
+          if (!id) {
+            resp.endAs("400 Bad Request", "ID is required in path")
+            return
           }
+
+          store.dispatch({
+            type: "DELETE /key/:id",
+            payload: {
+              key,
+              id,
+            },
+          })
+
+          await write()
+
+          resp.endAs("200 OK")
         }
       )
     })
 
+    // start
     server.listen(option.port, option.hostname, () => {
       console.log(`${PACKAGE_NAME} v${PACKAGE_VERSION}`)
       console.log(`http://${option.hostname}:${option.port}`)
