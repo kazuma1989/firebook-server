@@ -1,7 +1,6 @@
 import * as assert from "assert"
 import { suite } from "uvu"
 import { reducer } from "./reducer"
-import { Store } from "./store"
 
 const test = {
   "POST /key": suite("POST /key"),
@@ -11,15 +10,15 @@ const test = {
 }
 
 test["POST /key"]("新規追加できる", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
     comments: [{ id: "x", value: "X" }],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "POST /key",
     payload: {
       key: "posts",
@@ -30,25 +29,27 @@ test["POST /key"]("新規追加できる", async () => {
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
+  const expected: typeof state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
       { id: "c", text: "C" },
     ],
     comments: [{ id: "x", value: "X" }],
-  })
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 test["POST /key"]("ボディの id は無視する", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "POST /key",
     payload: {
       key: "posts",
@@ -60,24 +61,26 @@ test["POST /key"]("ボディの id は無視する", async () => {
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
+  const expected: typeof state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
       { id: "c", text: "C" },
     ],
-  })
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 test["PUT /key/:id"]("新規追加できる", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "PUT /key/:id",
     payload: {
       key: "posts",
@@ -88,24 +91,26 @@ test["PUT /key/:id"]("新規追加できる", async () => {
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
+  const expected: typeof state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
       { id: "c", text: "C" },
     ],
-  })
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 test["PUT /key/:id"]("上書きできる", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "PUT /key/:id",
     payload: {
       key: "posts",
@@ -116,23 +121,25 @@ test["PUT /key/:id"]("上書きできる", async () => {
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
+  const expected: typeof state = {
     posts: [
       { id: "a", text: "AAA" },
       { id: "b", text: "B" },
     ],
-  })
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 test["PUT /key/:id"]("ボディの id は無視する", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "PUT /key/:id",
     payload: {
       key: "posts",
@@ -144,24 +151,26 @@ test["PUT /key/:id"]("ボディの id は無視する", async () => {
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
+  const expected: typeof state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
       { id: "c", text: "C" },
     ],
-  })
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 test["PATCH /key/:id"]("オブジェクトの一部を書き換えられる", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A", foo: false },
       { id: "b", text: "B", foo: false },
     ],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "PATCH /key/:id",
     payload: {
       key: "posts",
@@ -172,23 +181,25 @@ test["PATCH /key/:id"]("オブジェクトの一部を書き換えられる", as
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
+  const expected: typeof state = {
     posts: [
       { id: "a", text: "AAA", foo: false },
       { id: "b", text: "B", foo: false },
     ],
-  })
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 test["PATCH /key/:id"]("id は変えられない", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "PATCH /key/:id",
     payload: {
       key: "posts",
@@ -200,23 +211,22 @@ test["PATCH /key/:id"]("id は変えられない", async () => {
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
-    posts: [
-      { id: "a", text: "A", foo: false },
-      { id: "b", text: "B" },
-    ],
-  })
+  const expected: typeof state = {
+    posts: [{ id: "a", text: "A", foo: false } as any, { id: "b", text: "B" }],
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 test["PATCH /key/:id"]("存在しない id は無視する", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "PATCH /key/:id",
     payload: {
       key: "posts",
@@ -227,23 +237,25 @@ test["PATCH /key/:id"]("存在しない id は無視する", async () => {
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
+  const expected: typeof state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 test["DELETE /key/:id"]("削除できる", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "DELETE /key/:id",
     payload: {
       key: "posts",
@@ -251,20 +263,22 @@ test["DELETE /key/:id"]("削除できる", async () => {
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
+  const expected: typeof state = {
     posts: [{ id: "b", text: "B" }],
-  })
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 test["DELETE /key/:id"]("存在しない id でも大丈夫", async () => {
-  const store = new Store(reducer, {
+  const state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
 
-  store.dispatch({
+  const actual = reducer(state, {
     type: "DELETE /key/:id",
     payload: {
       key: "posts",
@@ -272,12 +286,14 @@ test["DELETE /key/:id"]("存在しない id でも大丈夫", async () => {
     },
   })
 
-  assert.deepStrictEqual(store.getState(), {
+  const expected: typeof state = {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
-  })
+  }
+
+  assert.deepStrictEqual(actual, expected)
 })
 
 Object.values(test).forEach((t) => t.run())

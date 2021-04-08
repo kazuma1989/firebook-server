@@ -1,7 +1,5 @@
 import { EventEmitter } from "events"
 
-const actionEvent = Symbol("actionEvent")
-
 export class Store<S = any, A extends Action = Action> {
   private emitter = new EventEmitter()
 
@@ -27,6 +25,8 @@ export class Store<S = any, A extends Action = Action> {
     this.emitter.emit(actionEvent, action)
   }
 }
+
+const actionEvent = Symbol("actionEvent")
 
 export interface Reducer<S, A> {
   (state: S, action: A): S

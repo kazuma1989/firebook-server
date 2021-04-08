@@ -6,6 +6,14 @@ function reducer(state: number, action: Action): number {
   return state + 1
 }
 
+test("state を変えられる", async () => {
+  const store = new Store(reducer, 0)
+
+  store.dispatch({ type: "" })
+
+  assert.strictEqual(store.getState(), 1)
+})
+
 test("subscribe できる", async () => {
   const store = new Store(reducer, 0)
 
