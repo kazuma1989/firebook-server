@@ -5,18 +5,35 @@ interface Entry {
 
 interface DB extends Record<string, Entry[]> {}
 
-type RestAction = {
-  type: "PUT /post/:id"
-  payload: {
-    id: string
-    body: {
-      [key: string]: unknown
+type RestAction =
+  | {
+      type: "POST /post"
+      payload: {
+        id: string
+        body: {
+          [key: string]: unknown
+        }
+      }
     }
-  }
-}
+  | {
+      type: "PUT /post/:id"
+      payload: {
+        id: string
+        body: {
+          [key: string]: unknown
+        }
+      }
+    }
+  | {
+      type: "DELETE /post"
+      payload: {
+        id: string
+      }
+    }
 
 export function reducer(state: DB, action: RestAction): DB {
   switch (action.type) {
+    case "POST /post":
     case "PUT /post/:id": {
       const { posts = [] } = state
       const { id, body } = action.payload
@@ -33,6 +50,20 @@ export function reducer(state: DB, action: RestAction): DB {
         ...state,
         posts: [...posts.slice(0, index), newPost, ...posts.slice(index + 1)],
       }
+    }
+
+    case "DELETE /post": {
+      const { posts = [] } = state
+      const { id } = action.payload
+
+      return {
+        ...state,
+        posts: posts.filter((p) => p.id !== id),
+      }
+    }
+
+    default: {
+      return state
     }
   }
 }
