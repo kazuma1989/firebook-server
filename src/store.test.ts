@@ -1,98 +1,73 @@
 import * as assert from "assert"
-import { EventEmitter } from "events"
 import { test } from "uvu"
+import { Action, Store } from "./store"
 
-interface Reducer<State, Action> {
-  (state: State, action: Action): State
+function reducer(state: number, action: Action): number {
+  return state + 1
 }
 
-class Store<State = any, Action = any> {
-  private emitter = new EventEmitter()
+test("subscribe できる", async () => {
+  const store = new Store(reducer, 0)
 
-  constructor(reducer: Reducer<State, Action>, private state: State) {
-    this.emitter.on("action", (action: Action) => {
-      this.state = reducer(this.state, action)
-    })
-  }
-
-  getState(): State {
-    return this.state
-  }
-
-  subscribe(listener: () => void): () => void {
-    this.emitter.on("action", listener)
-
-    return () => {
-      this.emitter.off("action", listener)
-    }
-  }
-
-  dispatch(action: Action): void {
-    this.emitter.emit("action", action)
-  }
-}
-
-interface Entry {
-  id: string
-  [key: string]: unknown
-}
-
-interface DB extends Record<string, Entry[]> {}
-
-type RestAction = {
-  type: "PUT /post/:id"
-  payload: {
-    id: string
-    body: {
-      [key: string]: unknown
-    }
-  }
-}
-
-function reducer(state: DB, action: RestAction): DB {
-  switch (action.type) {
-    case "PUT /post/:id": {
-      const { id, body } = action.payload
-
-      return {
-        ...state,
-        posts: [
-          ...(state.posts ?? []),
-          {
-            ...body,
-            id,
-          },
-        ],
-      }
-    }
-  }
-}
-
-test("PUT /post/:id", async () => {
-  const store = new Store(reducer, {
-    posts: [
-      { id: "a", text: "A" },
-      { id: "b", text: "B" },
-    ],
+  let called = false
+  store.subscribe(() => {
+    called = true
   })
 
-  store.dispatch({
-    type: "PUT /post/:id",
-    payload: {
-      id: "c",
-      body: {
-        text: "C",
-      },
-    },
+  store.dispatch({ type: "" })
+
+  assert.ok(called, "リスナーが呼ばれていない")
+})
+
+test("unsubscribe できる", async () => {
+  const store = new Store(reducer, 0)
+
+  let called = false
+  const unsubscribe = store.subscribe(() => {
+    called = true
   })
 
-  assert.deepStrictEqual(store.getState(), {
-    posts: [
-      { id: "a", text: "A" },
-      { id: "b", text: "B" },
-      { id: "c", text: "C" },
-    ],
+  unsubscribe()
+
+  store.dispatch({ type: "" })
+
+  assert.ok(!called, "リスナーが呼ばれてしまった")
+})
+
+test("unsubscribe で間違って全部のリスナーを解除しない", async () => {
+  const store = new Store(reducer, 0)
+
+  let called1 = false
+  const unsubscribe1 = store.subscribe(() => {
+    called1 = true
   })
+
+  let called2 = false
+  store.subscribe(() => {
+    called2 = true
+  })
+
+  unsubscribe1()
+
+  store.dispatch({ type: "" })
+
+  assert.ok(!called1, "リスナーが呼ばれてしまった")
+  assert.ok(called2, "リスナーが呼ばれていない")
+})
+
+test("リスナーの呼び出しは reducer 実行後", async () => {
+  const store = new Store(reducer, 0)
+
+  let state = store.getState()
+  store.subscribe(() => {
+    // reducer -> listener の順であれば
+    // state が +1 された状態になっているはず。
+    state = store.getState()
+  })
+
+  store.dispatch({ type: "" })
+
+  assert.strictEqual(state, 1)
 })
 
 test.run()

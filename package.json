@@ -21,7 +21,8 @@
   "scripts": {
     "watch": "node build --watch",
     "prepack": "node build",
-    "test": "uvu -r esbuild-register src \".+\\.test\\.ts\""
+    "test": "uvu -r esbuild-register src \".+\\.test\\.ts\"",
+    "test:watch": "npx chokidar-cli \"src/**/*.ts\" --command \"npm test\" --initial"
   },
   "dependencies": {
     "formidable": "^1.2.2",
