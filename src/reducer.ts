@@ -7,8 +7,9 @@ interface DB extends Record<string, Entry[]> {}
 
 type RestAction =
   | {
-      type: "POST /post"
+      type: "POST /key"
       payload: {
+        key: string
         id: string
         body: {
           [key: string]: unknown
@@ -16,8 +17,9 @@ type RestAction =
       }
     }
   | {
-      type: "PUT /post/:id"
+      type: "PUT /key/:id"
       payload: {
+        key: string
         id: string
         body: {
           [key: string]: unknown
@@ -25,8 +27,9 @@ type RestAction =
       }
     }
   | {
-      type: "PATCH /post/:id"
+      type: "PATCH /key/:id"
       payload: {
+        key: string
         id: string
         body: {
           [key: string]: unknown
@@ -34,44 +37,45 @@ type RestAction =
       }
     }
   | {
-      type: "DELETE /post"
+      type: "DELETE /key/:id"
       payload: {
+        key: string
         id: string
       }
     }
 
 export function reducer(state: DB, action: RestAction): DB {
   switch (action.type) {
-    case "POST /post":
-    case "PUT /post/:id": {
-      const { posts = [] } = state
-      const { id, body } = action.payload
+    case "POST /key":
+    case "PUT /key/:id": {
+      const { key, id, body } = action.payload
+      const items = state[key] ?? []
 
-      const newPost = { ...body, id }
+      const newItem = { ...body, id }
 
-      let index = posts.findIndex((p) => p.id === newPost.id) ?? -1
+      let index = items.findIndex((p) => p.id === newItem.id) ?? -1
       if (index === -1) {
         // 見つからなかったら末尾に追加する。
-        index = posts.length
+        index = items.length
       }
 
       return {
         ...state,
-        posts: [...posts.slice(0, index), newPost, ...posts.slice(index + 1)],
+        [key]: [...items.slice(0, index), newItem, ...items.slice(index + 1)],
       }
     }
 
-    case "PATCH /post/:id": {
-      const { posts } = state
-      const { id, body } = action.payload
+    case "PATCH /key/:id": {
+      const { key, id, body } = action.payload
+      const items = state[key]
 
-      if (!posts) {
+      if (!items) {
         return state
       }
 
       return {
         ...state,
-        posts: posts.map((p) => {
+        [key]: items.map((p) => {
           if (p.id !== id) {
             return p
           }
@@ -85,17 +89,17 @@ export function reducer(state: DB, action: RestAction): DB {
       }
     }
 
-    case "DELETE /post": {
-      const { posts } = state
-      const { id } = action.payload
+    case "DELETE /key/:id": {
+      const { key, id } = action.payload
+      const items = state[key]
 
-      if (!posts) {
+      if (!items) {
         return state
       }
 
       return {
         ...state,
-        posts: posts.filter((p) => p.id !== id),
+        [key]: items.filter((p) => p.id !== id),
       }
     }
 

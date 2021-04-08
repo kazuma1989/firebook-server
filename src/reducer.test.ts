@@ -4,23 +4,25 @@ import { reducer } from "./reducer"
 import { Store } from "./store"
 
 const test = {
-  "POST /post": suite("POST /post"),
-  "PUT /post/:id": suite("PUT /post/:id"),
-  "PATCH /post/:id": suite("PATCH /post/:id"),
-  "DELETE /post/:id": suite("DELETE /post/:id"),
+  "POST /key": suite("POST /key"),
+  "PUT /key/:id": suite("PUT /key/:id"),
+  "PATCH /key/:id": suite("PATCH /key/:id"),
+  "DELETE /key/:id": suite("DELETE /key/:id"),
 }
 
-test["POST /post"]("新規追加できる", async () => {
+test["POST /key"]("新規追加できる", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A" },
       { id: "b", text: "B" },
     ],
+    comments: [{ id: "x", value: "X" }],
   })
 
   store.dispatch({
-    type: "POST /post",
+    type: "POST /key",
     payload: {
+      key: "posts",
       id: "c",
       body: {
         text: "C",
@@ -34,10 +36,11 @@ test["POST /post"]("新規追加できる", async () => {
       { id: "b", text: "B" },
       { id: "c", text: "C" },
     ],
+    comments: [{ id: "x", value: "X" }],
   })
 })
 
-test["POST /post"]("ボディの id は無視する", async () => {
+test["POST /key"]("ボディの id は無視する", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A" },
@@ -46,8 +49,9 @@ test["POST /post"]("ボディの id は無視する", async () => {
   })
 
   store.dispatch({
-    type: "POST /post",
+    type: "POST /key",
     payload: {
+      key: "posts",
       id: "c",
       body: {
         id: "a",
@@ -65,7 +69,7 @@ test["POST /post"]("ボディの id は無視する", async () => {
   })
 })
 
-test["PUT /post/:id"]("新規追加できる", async () => {
+test["PUT /key/:id"]("新規追加できる", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A" },
@@ -74,8 +78,9 @@ test["PUT /post/:id"]("新規追加できる", async () => {
   })
 
   store.dispatch({
-    type: "PUT /post/:id",
+    type: "PUT /key/:id",
     payload: {
+      key: "posts",
       id: "c",
       body: {
         text: "C",
@@ -92,7 +97,7 @@ test["PUT /post/:id"]("新規追加できる", async () => {
   })
 })
 
-test["PUT /post/:id"]("上書きできる", async () => {
+test["PUT /key/:id"]("上書きできる", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A" },
@@ -101,8 +106,9 @@ test["PUT /post/:id"]("上書きできる", async () => {
   })
 
   store.dispatch({
-    type: "PUT /post/:id",
+    type: "PUT /key/:id",
     payload: {
+      key: "posts",
       id: "a",
       body: {
         text: "AAA",
@@ -118,7 +124,7 @@ test["PUT /post/:id"]("上書きできる", async () => {
   })
 })
 
-test["PUT /post/:id"]("ボディの id は無視する", async () => {
+test["PUT /key/:id"]("ボディの id は無視する", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A" },
@@ -127,8 +133,9 @@ test["PUT /post/:id"]("ボディの id は無視する", async () => {
   })
 
   store.dispatch({
-    type: "PUT /post/:id",
+    type: "PUT /key/:id",
     payload: {
+      key: "posts",
       id: "c",
       body: {
         id: "a",
@@ -146,7 +153,7 @@ test["PUT /post/:id"]("ボディの id は無視する", async () => {
   })
 })
 
-test["PATCH /post/:id"]("オブジェクトの一部を書き換えられる", async () => {
+test["PATCH /key/:id"]("オブジェクトの一部を書き換えられる", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A", foo: false },
@@ -155,8 +162,9 @@ test["PATCH /post/:id"]("オブジェクトの一部を書き換えられる", a
   })
 
   store.dispatch({
-    type: "PATCH /post/:id",
+    type: "PATCH /key/:id",
     payload: {
+      key: "posts",
       id: "a",
       body: {
         text: "AAA",
@@ -172,7 +180,7 @@ test["PATCH /post/:id"]("オブジェクトの一部を書き換えられる", a
   })
 })
 
-test["PATCH /post/:id"]("id は変えられない", async () => {
+test["PATCH /key/:id"]("id は変えられない", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A" },
@@ -181,8 +189,9 @@ test["PATCH /post/:id"]("id は変えられない", async () => {
   })
 
   store.dispatch({
-    type: "PATCH /post/:id",
+    type: "PATCH /key/:id",
     payload: {
+      key: "posts",
       id: "a",
       body: {
         id: "d",
@@ -199,7 +208,7 @@ test["PATCH /post/:id"]("id は変えられない", async () => {
   })
 })
 
-test["PATCH /post/:id"]("存在しない id は無視する", async () => {
+test["PATCH /key/:id"]("存在しない id は無視する", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A" },
@@ -208,8 +217,9 @@ test["PATCH /post/:id"]("存在しない id は無視する", async () => {
   })
 
   store.dispatch({
-    type: "PATCH /post/:id",
+    type: "PATCH /key/:id",
     payload: {
+      key: "posts",
       id: "c",
       body: {
         text: "C",
@@ -225,7 +235,7 @@ test["PATCH /post/:id"]("存在しない id は無視する", async () => {
   })
 })
 
-test["DELETE /post/:id"]("削除できる", async () => {
+test["DELETE /key/:id"]("削除できる", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A" },
@@ -234,8 +244,9 @@ test["DELETE /post/:id"]("削除できる", async () => {
   })
 
   store.dispatch({
-    type: "DELETE /post",
+    type: "DELETE /key/:id",
     payload: {
+      key: "posts",
       id: "a",
     },
   })
@@ -245,7 +256,7 @@ test["DELETE /post/:id"]("削除できる", async () => {
   })
 })
 
-test["DELETE /post/:id"]("存在しない id でも大丈夫", async () => {
+test["DELETE /key/:id"]("存在しない id でも大丈夫", async () => {
   const store = new Store(reducer, {
     posts: [
       { id: "a", text: "A" },
@@ -254,8 +265,9 @@ test["DELETE /post/:id"]("存在しない id でも大丈夫", async () => {
   })
 
   store.dispatch({
-    type: "DELETE /post",
+    type: "DELETE /key/:id",
     payload: {
+      key: "posts",
       id: "c",
     },
   })
