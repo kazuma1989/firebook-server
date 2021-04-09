@@ -4,10 +4,11 @@ import * as path from "path"
 import { Writer } from "steno"
 import * as util from "util"
 import { helpMessage, parse } from "./parse"
-import { DB, reducer } from "./reducer"
+import { reducer } from "./reducer"
 import { createServer } from "./server"
 import { Store } from "./store"
 import { randomID } from "./util"
+import { watchFile } from "./watcher"
 
 /**
  * メインの処理。
@@ -41,33 +42,10 @@ async function run() {
       await writer.write(JSON.stringify(store.getState(), null, 2) + "\n")
     }
 
-    const databaseDir = path.dirname(databaseFile)
-
-    interface Watcher extends fs.FSWatcher {
-      on(event: "changed", listener: (data: DB) => void): this
-      emit(event: "changed", data: DB): void
-
-      on(event: string, listener: (...args: unknown[]) => void): this
-      on(event: string, listener: (...args: any[]) => void): this
-      emit(event: string, ...args: any[]): boolean
-    }
-
-    const watcher: Watcher = fs.watch(
-      databaseDir,
-      async function (this: Watcher, event, filename: string | Buffer | null) {
-        if (typeof filename !== "string") return
-        if (path.resolve(databaseDir, filename) !== databaseFile) return
-
-        const data = JSON.parse(
-          (await fs.promises.readFile(databaseFile)).toString()
-        )
-        if (util.isDeepStrictEqual(data, store.getState())) return
-
-        this.emit("changed", data)
-      }
-    )
-
+    const watcher = watchFile(databaseFile)
     watcher.on("changed", async (data) => {
+      if (util.isDeepStrictEqual(data, store.getState())) return
+
       store = new Store(reducer, data)
 
       server.close()
