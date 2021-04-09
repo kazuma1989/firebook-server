@@ -32,25 +32,29 @@ async function run() {
     const storageDir = path.resolve(process.cwd(), option.storage)
     const databaseFile = path.resolve(process.cwd(), option.database)
 
-    let store = new Store(
-      reducer,
-      JSON.parse((await fs.promises.readFile(databaseFile)).toString())
-    )
+    const initialDatabaseContent = (
+      await fs.promises.readFile(databaseFile)
+    ).toString()
 
-    const writer = new Writer(databaseFile)
-    const write = async () => {
-      await writer.write(JSON.stringify(store.getState(), null, 2) + "\n")
-    }
+    let store = new Store(reducer, JSON.parse(initialDatabaseContent))
 
     const watcher = watchFile(databaseFile)
-    watcher.on("changed", async (data) => {
-      if (util.isDeepStrictEqual(data, store.getState())) return
-
-      store = new Store(reducer, data)
+    watcher.on("changed", async (content) => {
+      store = new Store(reducer, JSON.parse(content))
 
       server.close()
       server = await start()
     })
+    watcher.prevContent = initialDatabaseContent
+
+    const writer = new Writer(databaseFile)
+    const write = async () => {
+      const content = JSON.stringify(store.getState(), null, 2) + "\n"
+
+      watcher.prevContent = content
+
+      await writer.write(content)
+    }
 
     const start = async () => {
       const server = createServer()
