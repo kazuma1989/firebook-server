@@ -5,18 +5,20 @@ const METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"] as const
 type METHODS = typeof METHODS[number]
 
 interface Route {
-  /** @example `GET /foo/(?<id>.+)` */
+  /** @example "GET /foo/(?<id>.+)" */
   eventName: `${METHODS} ${string}`
 
-  /** @example `GET` */
+  /** @example "GET" */
   method: METHODS
 
-  /** @example `/foo/(?<id>.+)` */
+  /** @example "/foo/(?<id>.+)" */
   rawPathPattern: string
 
   /** RegExp object which represents `rawPathPattern`. Case insensitive */
   pathPattern: RegExp
+}
 
+interface MatchedRoute extends Route {
   /** Matching URL */
   url: URL
 
@@ -34,7 +36,7 @@ interface Server<
 
   on<Event extends `${METHODS} ${string}`>(
     event: Event,
-    listener: (req: ReqType, resp: RespType, route: Route) => void
+    listener: (req: ReqType, resp: RespType) => void
   ): this
 
   /** @deprecated avoid type ambiguity */
@@ -52,6 +54,9 @@ class JSONRequest extends http.IncomingMessage {
   /** @example ["charset=utf-8"] */
   parameters?: string[]
 
+  /** it will be set after `match()` call */
+  route?: MatchedRoute
+
   constructor(socket: import("net").Socket) {
     super(socket)
   }
@@ -66,12 +71,42 @@ class JSONRequest extends http.IncomingMessage {
    * // parameters = ["param=\"a", "b\""]
    * ```
    */
-  detectMimeTypeAndParameters(): void {
+  setup(): void {
     const [mimeType, ...parameters] =
       this.headers["content-type"]?.split(";").map((v) => v.trim()) ?? []
 
     this.mimeType = mimeType
     this.parameters = parameters
+  }
+
+  /**
+   * @param routes
+   */
+  match(routes: Route[]): void {
+    const url = new URL(
+      path.posix.normalize(this.url!),
+      `http://${this.headers.host}`
+    )
+
+    for (const [
+      ,
+      { eventName, method, rawPathPattern, pathPattern },
+    ] of routes.entries()) {
+      if (this.method !== method) continue
+
+      const match = url.pathname.match(pathPattern)
+      if (!match) continue
+
+      this.route = {
+        eventName,
+        method,
+        rawPathPattern,
+        pathPattern,
+        url,
+        pathParam: match.groups ?? {},
+      }
+      break
+    }
   }
 
   /**
@@ -180,7 +215,7 @@ export function createServer(): Server<JSONRequest, JSONResponse> {
       ServerResponse: JSONResponse,
     })
     .once("listening", function setup(this: Server<JSONRequest, JSONResponse>) {
-      const routes = this.eventNames()
+      const routes: Route[] = this.eventNames()
         .filter(
           (eventName): eventName is `${METHODS} ${string}` =>
             typeof eventName === "string" &&
@@ -201,53 +236,27 @@ export function createServer(): Server<JSONRequest, JSONResponse> {
         })
 
       this.on("request", (req, resp) => {
-        if (!req.method || !req.url) {
-          resp.endAs("400 Bad Request")
-          return
-        }
+        try {
+          req.setup()
 
-        const normalized = {
-          method: req.method?.toUpperCase(),
-          url: path.posix.normalize(req.url),
-        }
-
-        let route: Route | undefined
-        for (let i = 0; i < routes.length; i++) {
-          const { eventName, method, rawPathPattern, pathPattern } = routes[i]!
-          if (normalized.method !== method) continue
-
-          let url: URL
           try {
-            url = new URL(normalized.url, `http://${req.headers.host}`)
-          } catch (err) {
-            resp.endAs("400 Bad Request", "Invalid Host header")
+            req.match(routes)
+          } catch (err: unknown) {
+            if ((err as any).code !== "ERR_INVALID_URL") {
+              throw err
+            }
+
+            resp.endAs("400 Bad Request")
             return
           }
 
-          const match = url.pathname.match(pathPattern)
-          if (!match) continue
-
-          route = {
-            eventName,
-            method,
-            rawPathPattern,
-            pathPattern,
-            url,
-            pathParam: match.groups ?? {},
+          if (!req.route) {
+            resp.endAs("404 Not Found")
+            return
           }
-          break
-        }
 
-        if (!route) {
-          resp.endAs("404 Not Found")
-          return
-        }
-
-        req.detectMimeTypeAndParameters()
-
-        try {
-          this.emit(route.eventName, req, resp, route)
-        } catch (err) {
+          this.emit(req.route.eventName, req, resp)
+        } catch (err: unknown) {
           console.error(err)
 
           resp.endAs("503 Service Unavailable")

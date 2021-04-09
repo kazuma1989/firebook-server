@@ -36,7 +36,10 @@ async function run() {
       await fs.promises.readFile(databaseFile)
     ).toString()
 
-    let store = new Store(reducer, JSON.parse(initialDatabaseContent))
+    let store = new Store(
+      reducer,
+      JSON.parse(initialDatabaseContent) as ReturnType<typeof reducer>
+    )
 
     const watcher = watchFile(databaseFile)
     watcher.on("changed", async (content) => {
@@ -80,45 +83,43 @@ async function run() {
       })
 
       // storage ディレクトリの中身は静的ファイルとしてレスポンスする。
-      server.on(
-        "GET /storage/(?<file>.+)",
-        (req, resp, { pathParam: { file } }) => {
-          if (!file) {
-            resp.endAs("404 Not Found")
-            return
-          }
-
-          const mimeTypes = {
-            ".png": "image/png",
-            ".jpg": "image/jpg",
-            ".jpeg": "image/jpg",
-            ".gif": "image/gif",
-          }
-
-          const filePath = path.join(storageDir, path.normalize(file))
-
-          fs.createReadStream(filePath)
-            .on("error", () => {
-              resp.endAs("404 Not Found")
-            })
-            .once("open", () => {
-              resp.setHeader(
-                "Content-Type",
-                mimeTypes[path.extname(filePath).toLowerCase()] ??
-                  "application/octet-stream"
-              )
-            })
-            .pipe(resp)
-            .on("finish", () => {
-              resp.end()
-            })
-            .on("error", (err) => {
-              console.error(err)
-
-              resp.endAs("503 Service Unavailable")
-            })
+      server.on("GET /storage/(?<file>.+)", (req, resp) => {
+        const { file } = req.route?.pathParam ?? {}
+        if (!file) {
+          resp.endAs("404 Not Found")
+          return
         }
-      )
+
+        const mimeTypes = {
+          ".png": "image/png",
+          ".jpg": "image/jpg",
+          ".jpeg": "image/jpg",
+          ".gif": "image/gif",
+        }
+
+        const filePath = path.join(storageDir, path.normalize(file))
+
+        fs.createReadStream(filePath)
+          .on("error", () => {
+            resp.endAs("404 Not Found")
+          })
+          .once("open", () => {
+            resp.setHeader(
+              "Content-Type",
+              mimeTypes[path.extname(filePath).toLowerCase()] ??
+                "application/octet-stream"
+            )
+          })
+          .pipe(resp)
+          .on("finish", () => {
+            resp.end()
+          })
+          .on("error", (err) => {
+            console.error(err)
+
+            resp.endAs("503 Service Unavailable")
+          })
+      })
 
       // ファイルアップロードのエンドポイント。
       server.on("POST /storage", (req, resp) => {
@@ -144,15 +145,12 @@ async function run() {
           const origin = `http://${
             req.headers.host ?? `${option.hostname}:${option.port}`
           }`
+          const downloadURL = `${origin}/storage/${path.basename(file.path)}`
 
           resp.writeHead(200, {
-            "Content-Type": "application/json",
+            Location: downloadURL,
           })
-          resp.end(
-            stringify({
-              downloadURL: `${origin}/storage/${path.basename(file.path)}`,
-            })
-          )
+          resp.end(stringify({ downloadURL }))
         })
       })
 
@@ -161,7 +159,7 @@ async function run() {
         if (!key.match(/^[A-Za-z0-9_-]+$/i)) return
 
         // GET all
-        server.on(`GET /${key}` as "GET /key", (req, resp, {}) => {
+        server.on(`GET /${key}` as "GET /key", (req, resp) => {
           const items = store.getState()[key]
           if (!items) {
             resp.endAs("404 Not Found")
@@ -172,21 +170,20 @@ async function run() {
         })
 
         // GET single
-        server.on(
-          `GET /${key}/(?<id>.+)` as "GET /key/:id",
-          (req, resp, { pathParam: { id } }) => {
-            const item = store.getState()[key]?.find((v) => v.id === id)
-            if (!item) {
-              resp.endAs("404 Not Found")
-              return
-            }
+        server.on(`GET /${key}/(?<id>.+)` as "GET /key/:id", (req, resp) => {
+          const { id } = req.route?.pathParam ?? {}
 
-            resp.end(stringify(item))
+          const item = store.getState()[key]?.find((v) => v.id === id)
+          if (!item) {
+            resp.endAs("404 Not Found")
+            return
           }
-        )
+
+          resp.end(stringify(item))
+        })
 
         // POST
-        server.on(`POST /${key}` as "POST /key", async (req, resp, { url }) => {
+        server.on(`POST /${key}` as "POST /key", async (req, resp) => {
           if (req.mimeType !== "application/json") {
             resp.endAs(
               "400 Bad Request",
@@ -221,7 +218,7 @@ async function run() {
           await write()
 
           resp.writeHead(201, {
-            Location: `${url.toString()}/${item.id}`,
+            Location: `${req.route?.url.toString()}/${item.id}`,
           })
           resp.end(stringify(item))
         })
@@ -229,7 +226,8 @@ async function run() {
         // PUT
         server.on(
           `PUT /${key}/(?<id>.+)` as "PUT /key/:id",
-          async (req, resp, { url, pathParam: { id } }) => {
+          async (req, resp) => {
+            const { id } = req.route?.pathParam ?? {}
             if (!id) {
               resp.endAs("400 Bad Request", "ID is required in path")
               return
@@ -267,7 +265,7 @@ async function run() {
             await write()
 
             resp.writeHead(200, {
-              Location: url.toString(),
+              Location: req.route?.url.toString(),
             })
             resp.end(stringify(item))
           }
@@ -276,7 +274,8 @@ async function run() {
         // PATCH
         server.on(
           `PATCH /${key}/(?<id>.+)` as "PATCH /key/:id",
-          async (req, resp, { url, pathParam: { id } }) => {
+          async (req, resp) => {
+            const { id } = req.route?.pathParam ?? {}
             if (!id) {
               resp.endAs("400 Bad Request", "ID is required in path")
               return
@@ -314,7 +313,7 @@ async function run() {
             await write()
 
             resp.writeHead(200, {
-              Location: url.toString(),
+              Location: req.route?.url.toString(),
             })
             resp.end(stringify(item))
           }
@@ -323,7 +322,8 @@ async function run() {
         // DELETE
         server.on(
           `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
-          async (req, resp, { pathParam: { id } }) => {
+          async (req, resp) => {
+            const { id } = req.route?.pathParam ?? {}
             if (!id) {
               resp.endAs("400 Bad Request", "ID is required in path")
               return
@@ -352,7 +352,7 @@ async function run() {
     }
 
     let server = await start()
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(err)
 
     process.exit(1)

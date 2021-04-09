@@ -42,7 +42,7 @@ export function watchFile(filePath: string): Watcher {
         this.prevContent = content
 
         this.emit("changed", content)
-      } catch (err) {
+      } catch (err: unknown) {
         this.emit("warn", err)
       }
     }
