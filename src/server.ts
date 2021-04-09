@@ -37,7 +37,9 @@ interface Server<
     listener: (req: ReqType, resp: RespType, route: Route) => void
   ): this
 
+  /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: unknown[]) => void): this
+  /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: any[]) => void): this
 }
 
@@ -107,7 +109,9 @@ class JSONRequest extends http.IncomingMessage {
 interface JSONRequest {
   on(event: "warn", listener: (info: JSONRequestWarnInfo) => void): this
 
+  /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: unknown[]) => void): this
+  /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: any[]) => void): this
 }
 
