@@ -1,4 +1,3 @@
-import formidable from "formidable"
 import * as fs from "fs"
 import * as path from "path"
 import { Writer } from "steno"
@@ -80,13 +79,15 @@ async function run() {
       server.on("request", (req, resp) => {
         resp.setHeader("Access-Control-Allow-Origin", "*")
         resp.setHeader("Access-Control-Allow-Methods", "*")
+        resp.setHeader("Access-Control-Allow-Headers", "*")
+        resp.setHeader("Access-Control-Expose-Headers", "*")
       })
 
       // storage ディレクトリの中身は静的ファイルとしてレスポンスする。
       server.on("GET /storage/(?<file>.+)", (req, resp) => {
         const { file } = req.route?.pathParam ?? {}
         if (!file) {
-          resp.endAs("404 Not Found")
+          resp.writeStatus("404 Not Found").end()
           return
         }
 
@@ -101,7 +102,7 @@ async function run() {
 
         fs.createReadStream(filePath)
           .on("error", () => {
-            resp.endAs("404 Not Found")
+            resp.writeStatus("404 Not Found").end()
           })
           .once("open", () => {
             resp.setHeader(
@@ -117,40 +118,45 @@ async function run() {
           .on("error", (err) => {
             console.error(err)
 
-            resp.endAs("503 Service Unavailable")
+            resp.writeStatus("500 Internal Server Error").end()
           })
       })
 
+      // TODO CORS 設定は一箇所にまとめたい
+      server.on("OPTIONS /storage", (req, resp) => {
+        resp.writeStatus("200 OK").end()
+      })
+
       // ファイルアップロードのエンドポイント。
-      server.on("POST /storage", (req, resp) => {
-        const form = new formidable.IncomingForm({
-          uploadDir: storageDir,
-          keepExtensions: true,
-        })
+      server.on("POST /storage", async (req, resp) => {
+        const mimeTypes = {
+          ".png": "image/png",
+          ".jpg": "image/jpg",
+          ".jpeg": "image/jpg",
+          ".gif": "image/gif",
+        }
 
-        form.parse(req, (err, fields, files) => {
-          if (err) {
-            console.error("error", err)
+        const [ext] =
+          Object.entries(mimeTypes).find(([, type]) => type === req.mimeType) ??
+          []
+        if (!ext) {
+          resp.writeStatus("415 Unsupported Media Type").end()
+          return
+        }
 
-            resp.endAs("400 Bad Request")
-            return
-          }
+        const filePath = path.join(storageDir, `${randomID()}${ext}`)
 
-          const [file] = Object.values(files)
-          if (!file || Array.isArray(file)) {
-            resp.endAs("400 Bad Request")
-            return
-          }
-
+        req.pipe(fs.createWriteStream(filePath)).on("close", () => {
           const origin = `http://${
             req.headers.host ?? `${option.hostname}:${option.port}`
           }`
-          const downloadURL = `${origin}/storage/${path.basename(file.path)}`
+          const downloadURL = `${origin}/storage/${path.basename(filePath)}`
 
-          resp.writeHead(200, {
-            Location: downloadURL,
-          })
-          resp.end(stringify({ downloadURL }))
+          resp
+            .writeStatus("201 Created", {
+              Location: downloadURL,
+            })
+            .end()
         })
       })
 
@@ -162,11 +168,15 @@ async function run() {
         server.on(`GET /${key}` as "GET /key", (req, resp) => {
           const items = store.getState()[key]
           if (!items) {
-            resp.endAs("404 Not Found")
+            resp.writeStatus("404 Not Found").end()
             return
           }
 
-          resp.end(stringify(items))
+          resp
+            .writeStatus("200 OK", {
+              "Content-Type": "application/json",
+            })
+            .end(stringify(items))
         })
 
         // GET single
@@ -175,26 +185,27 @@ async function run() {
 
           const item = store.getState()[key]?.find((v) => v.id === id)
           if (!item) {
-            resp.endAs("404 Not Found")
+            resp.writeStatus("404 Not Found").end()
             return
           }
 
-          resp.end(stringify(item))
+          resp
+            .writeStatus("200 OK", {
+              "Content-Type": "application/json",
+            })
+            .end(stringify(item))
         })
 
         // POST
         server.on(`POST /${key}` as "POST /key", async (req, resp) => {
           if (req.mimeType !== "application/json") {
-            resp.endAs(
-              "400 Bad Request",
-              `Content-Type is not "application/json"`
-            )
+            resp.writeStatus("415 Unsupported Media Type").end()
             return
           }
 
           const body = await req.parseBodyAsJSONObject().catch(() => null)
           if (!body) {
-            resp.endAs("400 Bad Request", "Malformed JSON input")
+            resp.writeStatus("400 Malformed JSON input").end()
             return
           }
 
@@ -211,16 +222,18 @@ async function run() {
 
           const item = store.getState()[key]?.find((i) => i.id === id)
           if (!item) {
-            resp.endAs("404 Not Found")
+            resp.writeStatus("500 Internal Server Error").end()
             return
           }
 
           await write()
 
-          resp.writeHead(201, {
-            Location: `${req.route?.url.toString()}/${item.id}`,
-          })
-          resp.end(stringify(item))
+          resp
+            .writeStatus("201 Created", {
+              "Content-Type": "application/json",
+              Location: `${req.normalizedURL?.toString()}/${item.id}`,
+            })
+            .end(stringify(item))
         })
 
         // PUT
@@ -229,21 +242,18 @@ async function run() {
           async (req, resp) => {
             const { id } = req.route?.pathParam ?? {}
             if (!id) {
-              resp.endAs("400 Bad Request", "ID is required in path")
+              resp.writeStatus("500 Internal Server Error").end()
               return
             }
 
             if (req.mimeType !== "application/json") {
-              resp.endAs(
-                "400 Bad Request",
-                `Content-Type is not "application/json"`
-              )
+              resp.writeStatus("415 Unsupported Media Type").end()
               return
             }
 
             const body = await req.parseBodyAsJSONObject().catch(() => null)
             if (!body) {
-              resp.endAs("400 Bad Request", "Malformed JSON input")
+              resp.writeStatus("400 Malformed JSON input").end()
               return
             }
 
@@ -258,16 +268,17 @@ async function run() {
 
             const item = store.getState()[key]?.find((i) => i.id === id)
             if (!item) {
-              resp.endAs("404 Not Found")
+              resp.writeStatus("500 Internal Server Error").end()
               return
             }
 
             await write()
 
-            resp.writeHead(200, {
-              Location: req.route?.url.toString(),
-            })
-            resp.end(stringify(item))
+            resp
+              .writeStatus("200 OK", {
+                "Content-Type": "application/json",
+              })
+              .end(stringify(item))
           }
         )
 
@@ -277,21 +288,18 @@ async function run() {
           async (req, resp) => {
             const { id } = req.route?.pathParam ?? {}
             if (!id) {
-              resp.endAs("400 Bad Request", "ID is required in path")
+              resp.writeStatus("500 Internal Server Error").end()
               return
             }
 
             if (req.mimeType !== "application/json") {
-              resp.endAs(
-                "400 Bad Request",
-                `Content-Type is not "application/json"`
-              )
+              resp.writeStatus("415 Unsupported Media Type").end()
               return
             }
 
             const body = await req.parseBodyAsJSONObject().catch(() => null)
             if (!body) {
-              resp.endAs("400 Bad Request", "Malformed JSON input")
+              resp.writeStatus("400 Bad Request").end()
               return
             }
 
@@ -306,16 +314,17 @@ async function run() {
 
             const item = store.getState()[key]?.find((i) => i.id === id)
             if (!item) {
-              resp.endAs("404 Not Found")
+              resp.writeStatus("500 Internal Server Error").end()
               return
             }
 
             await write()
 
-            resp.writeHead(200, {
-              Location: req.route?.url.toString(),
-            })
-            resp.end(stringify(item))
+            resp
+              .writeStatus("200 OK", {
+                "Content-Type": "application/json",
+              })
+              .end(stringify(item))
           }
         )
 
@@ -325,7 +334,7 @@ async function run() {
           async (req, resp) => {
             const { id } = req.route?.pathParam ?? {}
             if (!id) {
-              resp.endAs("400 Bad Request", "ID is required in path")
+              resp.writeStatus("500 Internal Server Error").end()
               return
             }
 
@@ -339,7 +348,7 @@ async function run() {
 
             await write()
 
-            resp.endAs("200 OK")
+            resp.writeStatus("204 No Content").end()
           }
         )
       })

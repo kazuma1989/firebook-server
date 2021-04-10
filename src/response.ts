@@ -1,39 +1,60 @@
 import * as http from "http"
 
 /**
- * Content-Type のデフォルト値が application/json
  */
 export class JSONResponse extends http.ServerResponse {
-  constructor(req: http.IncomingMessage) {
-    super(req)
-
-    this.setHeader("Content-Type", "application/json")
-  }
-
   /**
-   * `null` という文字列（JSON として解釈可能）を返す。
-   *
    * @param status
-   * @param message デフォルト以外のステータスメッセージにしたいときは指定する。
+   * @param headers
    */
-  endAs(
-    status:
-      | "200 OK"
-      | "400 Bad Request"
-      | "404 Not Found"
-      | "405 Method Not Allowed"
-      | "503 Service Unavailable",
-    message?: string
-  ): void {
-    const statusCode = parseInt(status.split(" ")[0]!) || 500
-
-    if (message) {
-      this.statusMessage = message
+  writeStatus(
+    status: `${number} ${string}`,
+    headers?: OutgoingHttpHeaders
+  ): this {
+    const [statusCodeStr, ...words] = status.split(" ")
+    const statusCode = parseInt(statusCodeStr!)
+    if (isNaN(statusCode)) {
+      throw new Error(`status code is not a number: "${status}"`)
     }
 
-    this.writeHead(statusCode, {
-      "Content-Type": "application/json",
-    })
-    this.end("null")
+    const reasonPhrase = words.join(" ")
+
+    this.writeHead(statusCode, reasonPhrase, headers)
+
+    return this
   }
+}
+
+export interface JSONResponse extends http.ServerResponse {
+  setHeader(
+    name:
+      | "Access-Control-Allow-Headers"
+      | "Access-Control-Allow-Methods"
+      | "Access-Control-Allow-Origin"
+      | "Access-Control-Expose-Headers"
+      | "Content-Type"
+      | "Location",
+    value: number | string | ReadonlyArray<string>
+  ): void
+  setHeader(name: string, value: number | string | ReadonlyArray<string>): void
+
+  writeStatus(status: STATUS, headers?: OutgoingHttpHeaders): this
+}
+
+type STATUS =
+  | "200 OK"
+  | "201 Created"
+  | "204 No Content"
+  | "400 Bad Request"
+  | "404 Not Found"
+  | "405 Method Not Allowed"
+  | "415 Unsupported Media Type"
+  | "500 Internal Server Error"
+  | "503 Service Unavailable"
+
+interface OutgoingHttpHeaders extends http.OutgoingHttpHeaders {
+  "Content-Type"?: "application/json"
+  Location?: number | string | string[] | undefined
+
+  [header: string]: number | string | string[] | undefined
 }

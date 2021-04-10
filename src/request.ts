@@ -11,7 +11,10 @@ export class JSONRequest extends http.IncomingMessage {
   parameters?: string[]
 
   /** it will be set after `match()` call */
-  route?: MatchedRoute
+  route?: MatchingRoute
+
+  /** */
+  normalizedURL?: URL
 
   /**
    */
@@ -29,38 +32,39 @@ export class JSONRequest extends http.IncomingMessage {
    * // parameters = ["param=\"a", "b\""]
    * ```
    */
-  setup(): void {
+  setup(): boolean {
     const [mimeType, ...parameters] =
       this.headers["content-type"]?.split(";").map((v) => v.trim()) ?? []
 
     this.mimeType = mimeType
     this.parameters = parameters
+
+    this.normalizedURL = new URL(
+      path.posix.normalize(this.url),
+      `http://${this.headers.host}`
+    )
+
+    if (!METHODS.includes(this.method)) {
+      return false
+    }
+
+    return true
   }
 
   /**
    * @param routes
    */
   match(routes: Route[]): void {
-    const url = new URL(
-      path.posix.normalize(this.url!),
-      `http://${this.headers.host}`
-    )
-
-    for (const [
-      ,
-      { eventName, method, rawPathPattern, pathPattern },
-    ] of routes.entries()) {
+    for (const [, { eventName, method, pathPattern }] of routes.entries()) {
       if (this.method !== method) continue
 
-      const match = url.pathname.match(pathPattern)
+      const match = this.normalizedURL?.pathname.match(pathPattern)
       if (!match) continue
 
       this.route = {
         eventName,
         method,
-        rawPathPattern,
         pathPattern,
-        url,
         pathParam: match.groups ?? {},
       }
       break
@@ -99,7 +103,10 @@ export class JSONRequest extends http.IncomingMessage {
   }
 }
 
-export interface JSONRequest {
+export interface JSONRequest extends http.IncomingMessage {
+  method: METHODS
+  url: string
+
   on(event: "warn", listener: (info: JSONRequestWarnInfo) => void): this
 
   /** @deprecated avoid type ambiguity */
@@ -116,6 +123,7 @@ type JSONRequestWarnInfo = {
 
 export const METHODS = [
   "DELETE",
+  "HEAD",
   "GET",
   "OPTIONS",
   "PATCH",
@@ -127,21 +135,18 @@ export type METHODS = typeof METHODS[number]
 
 export interface Route {
   /** @example "GET /foo/(?<id>.+)" */
-  eventName: `${METHODS} ${string}`
+  eventName: string
 
   /** @example "GET" */
-  method: METHODS
+  method: string
 
-  /** @example "/foo/(?<id>.+)" */
-  rawPathPattern: string
-
-  /** RegExp object which represents `rawPathPattern`. Case insensitive */
+  /** RegExp object which represents `eventName`. Case insensitive */
   pathPattern: RegExp
 }
 
-export interface MatchedRoute extends Route {
-  /** Matching URL */
-  url: URL
+export interface MatchingRoute extends Route {
+  /** @example "GET" */
+  method: METHODS
 
   /** RegExp matching groups for `pathPattern` */
   pathParam: {

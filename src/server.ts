@@ -47,21 +47,24 @@ export function createServer(): Server<JSONRequest, JSONResponse> {
 
       this.on("request", (req, resp) => {
         try {
-          req.setup()
+          if (!req.setup()) {
+            resp.writeStatus("405 Method Not Allowed").end()
+            return
+          }
 
           try {
             req.match(routes)
           } catch (err: unknown) {
-            if ((err as any).code !== "ERR_INVALID_URL") {
-              throw err
+            if ((err as any).code === "ERR_INVALID_URL") {
+              resp.writeStatus("400 Bad Request").end()
+              return
             }
 
-            resp.endAs("400 Bad Request")
-            return
+            throw err
           }
 
           if (!req.route) {
-            resp.endAs("404 Not Found")
+            resp.writeStatus("404 Not Found").end()
             return
           }
 
@@ -69,7 +72,8 @@ export function createServer(): Server<JSONRequest, JSONResponse> {
         } catch (err: unknown) {
           console.error(err)
 
-          resp.endAs("503 Service Unavailable")
+          resp.writeStatus("500 Internal Server Error").end()
+          return
         }
       })
     })
