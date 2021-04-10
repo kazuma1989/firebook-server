@@ -25,17 +25,14 @@
     "test:watch": "npx chokidar-cli \"src/**/*.ts\" --command \"npm test\" --initial"
   },
   "dependencies": {
-    "formidable": "^1.2.2",
     "mri": "^1.1.6",
     "steno": "^1.0.0"
   },
   "bundledDependencies": [
-    "formidable",
     "mri",
     "steno"
   ],
   "devDependencies": {
-    "@types/formidable": "^1.2.1",
     "@types/mri": "^1.1.0",
     "@types/node": "10.x.x",
     "esbuild": "^0.11.5",
