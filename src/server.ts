@@ -1,6 +1,6 @@
 import * as http from "http"
-import { JSONRequest, Route } from "./request"
-import { JSONResponse } from "./response"
+import { Request, Route } from "./request"
+import { Response } from "./response"
 import { nonNullable } from "./util"
 
 /**
@@ -22,8 +22,8 @@ import { nonNullable } from "./util"
 export class Server extends http.Server {
   constructor() {
     super({
-      IncomingMessage: JSONRequest,
-      ServerResponse: JSONResponse,
+      IncomingMessage: Request,
+      ServerResponse: Response,
     })
 
     this.once("listening", () => {
@@ -85,14 +85,11 @@ export class Server extends http.Server {
 }
 
 export interface Server extends http.Server {
-  on(
-    event: "request",
-    listener: (req: JSONRequest, resp: JSONResponse) => void
-  ): this
+  on(event: "request", listener: (req: Request, resp: Response) => void): this
 
   on(
     event: RoutingEvent,
-    listener: (req: JSONRequest, resp: JSONResponse) => void
+    listener: (req: Request, resp: Response) => void
   ): this
 
   /** @deprecated avoid type ambiguity */
@@ -100,7 +97,7 @@ export interface Server extends http.Server {
   /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: any[]) => void): this
 
-  emit(event: RoutingEvent, req: JSONRequest, resp: JSONResponse): boolean
+  emit(event: RoutingEvent, req: Request, resp: Response): boolean
 
   /** @deprecated avoid type ambiguity */
   emit(event: string | symbol, ...args: any[]): boolean

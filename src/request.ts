@@ -3,7 +3,7 @@ import * as path from "path"
 
 /**
  */
-export class JSONRequest extends http.IncomingMessage {
+export class Request extends http.IncomingMessage {
   /** @example "application/json" */
   mimeType?: string
 
@@ -97,7 +97,7 @@ export class JSONRequest extends http.IncomingMessage {
   }
 }
 
-export interface JSONRequest extends http.IncomingMessage {
+export interface Request extends http.IncomingMessage {
   method: string
   url: string
 

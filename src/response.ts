@@ -2,7 +2,7 @@ import * as http from "http"
 
 /**
  */
-export class JSONResponse extends http.ServerResponse {
+export class Response extends http.ServerResponse {
   /**
    * @param status
    * @param headers
@@ -25,7 +25,7 @@ export class JSONResponse extends http.ServerResponse {
   }
 }
 
-export interface JSONResponse extends http.ServerResponse {
+export interface Response extends http.ServerResponse {
   setHeader(
     name:
       | "Access-Control-Allow-Headers"
