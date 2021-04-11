@@ -176,7 +176,7 @@ async function run() {
           return
         }
 
-        const filePath = path.join(storageDir, file)
+        const filePath = path.join(storageDir, path.normalize(file))
 
         await fs.promises.unlink(filePath).catch(() => null)
 
