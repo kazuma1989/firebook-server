@@ -3,9 +3,7 @@ import * as http from "http"
 /**
  */
 export class Response extends http.ServerResponse {
-  constructor(req: http.IncomingMessage) {
-    super(req)
-  }
+  readonly InternalServerError = new Error("500 Internal Server Error")
 
   /**
    * @param status

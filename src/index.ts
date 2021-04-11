@@ -172,8 +172,7 @@ async function run() {
       server.on("DELETE /storage/(?<file>.+)", async (req, resp) => {
         const { file } = req.route?.pathParam ?? {}
         if (!file) {
-          resp.writeStatus("204 No Content").end()
-          return
+          throw resp.InternalServerError
         }
 
         const filePath = path.join(storageDir, path.normalize(file))

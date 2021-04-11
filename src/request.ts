@@ -4,8 +4,8 @@ import * as path from "path"
 /**
  */
 export class Request extends http.IncomingMessage {
-  method: string
-  url: string
+  readonly method: string
+  readonly url: string
 
   /** @example "application/json" */
   mimeType?: string

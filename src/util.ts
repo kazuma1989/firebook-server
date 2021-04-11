@@ -1,3 +1,10 @@
+import * as util from "util"
+
+/**
+ * 環境変数 NODE_DEBUG にパッケージ名を含むときだけログ出力する。
+ */
+export const debuglog = util.debuglog(PACKAGE_NAME)
+
 /**
  * ランダムな ID `[0-9A-Za-z_]{12}` を作成する。
  * 暗号学的強度はないので本格的な利用には耐えない。

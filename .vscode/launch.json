@@ -14,6 +14,9 @@
       "runtimeExecutable": "npx",
       "skipFiles": ["<node_internals>/**"],
       "type": "pwa-node",
+      "env": {
+        "NODE_DEBUG": "@kazuma1989/firebook-server"
+      },
 
       // npx nodemon -e js ${workspaceFolder}/dist/index.js
       "runtimeArgs": ["nodemon", "-e", "js"],

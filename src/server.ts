@@ -1,7 +1,7 @@
 import * as http from "http"
 import { Request, Route } from "./request"
 import { Response } from "./response"
-import { nonNullable } from "./util"
+import { debuglog, nonNullable } from "./util"
 
 /**
  * @example
@@ -26,27 +26,73 @@ export class Server extends http.Server {
       ServerResponse: Response,
     })
 
+    // エラーをキャッチし損ねたときもハングアップせずに 500 Internal Server Error で応答する。
+    this.on("request", (req, resp) => {
+      const uncaughtException: NodeJS.UncaughtExceptionListener = (error) => {
+        if (error !== resp.InternalServerError) {
+          console.error("UNCAUGHT", error)
+        }
+
+        resp.writeStatus("500 Internal Server Error").end()
+      }
+      const unhandledRejection: NodeJS.UnhandledRejectionListener = (
+        reason,
+        promise
+      ) => {
+        if (reason !== resp.InternalServerError) {
+          console.error("UNHANDLED", reason)
+        }
+
+        resp.writeStatus("500 Internal Server Error").end()
+      }
+
+      process.once("uncaughtException", uncaughtException)
+      process.once("unhandledRejection", unhandledRejection)
+
+      resp.on("finish", () => {
+        process.off("uncaughtException", uncaughtException)
+        process.off("unhandledRejection", unhandledRejection)
+      })
+    })
+
     this.once("listening", () => {
       const routes: Route[] = this.eventNames()
         .map((eventName) => {
+          debuglog("installing route:", eventName)
+
           if (typeof eventName !== "string") return
 
           const method = METHODS.find((m) => eventName.startsWith(`${m} `))
           if (!method) return
 
+          let pathPattern: RegExp
+          try {
+            pathPattern = new RegExp(
+              `^${eventName.slice(method.length + 1)}$`,
+              "i"
+            )
+          } catch (error: unknown) {
+            if (error instanceof Error) {
+              console.error("WARN", error.message)
+            }
+
+            console.error("failed to install", eventName)
+            return
+          }
+
           return {
             eventName: eventName as `${METHODS} ${string}`,
             method,
-            pathPattern: new RegExp(
-              `^${eventName.slice(method.length + 1)}$`,
-              "i"
-            ),
+            pathPattern,
           }
         })
         .filter(nonNullable)
 
       this.on("request", (req, resp) => {
-        if (resp.headersSent || resp.finished) return
+        if (resp.headersSent || resp.finished) {
+          debuglog("headers sent or response finished")
+          return
+        }
 
         try {
           if (!METHODS.includes(req.method as any)) {
@@ -84,6 +130,7 @@ export class Server extends http.Server {
   }
 
   on(event: "request", listener: (req: Request, resp: Response) => void): this
+  on(event: "uncaught", listener: (req: Request, resp: Response) => void): this
   on(
     event: RoutingEvent,
     listener: (req: Request, resp: Response) => void
@@ -94,6 +141,7 @@ export class Server extends http.Server {
     return super.on(event, listener)
   }
 
+  emit(event: "uncaught", req: Request, resp: Response): boolean
   emit(event: RoutingEvent, req: Request, resp: Response): boolean
   emit(event: string | symbol, ...args: any[]): boolean
   emit(event: string | symbol, ...args: any[]): boolean {
