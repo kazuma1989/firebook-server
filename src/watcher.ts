@@ -13,12 +13,9 @@ interface Watcher extends fs.FSWatcher {
   emit(event: "warn", err: unknown): boolean
 
   // general
-  /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: unknown[]) => void): this
-  /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: any[]) => void): this
 
-  /** @deprecated avoid type ambiguity */
   emit(event: string, ...args: any[]): boolean
 }
 

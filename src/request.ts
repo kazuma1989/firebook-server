@@ -4,6 +4,9 @@ import * as path from "path"
 /**
  */
 export class Request extends http.IncomingMessage {
+  method: string
+  url: string
+
   /** @example "application/json" */
   mimeType?: string
 
@@ -20,6 +23,9 @@ export class Request extends http.IncomingMessage {
    */
   constructor(socket: import("net").Socket) {
     super(socket)
+
+    this.method = super.method!
+    this.url = super.url!
   }
 
   /**
@@ -92,21 +98,16 @@ export class Request extends http.IncomingMessage {
     }
   }
 
+  on(event: "warn", listener: (info: JSONRequestWarnInfo) => void): this
+  on(event: string, listener: (...args: unknown[]) => void): this
+  on(event: string, listener: (...args: any[]) => void): this
+  on(event: string, listener: (...args: any[]) => void): this {
+    return super.on(event, listener)
+  }
+
   private warn(info: JSONRequestWarnInfo) {
     this.emit("warn", info)
   }
-}
-
-export interface Request extends http.IncomingMessage {
-  method: string
-  url: string
-
-  on(event: "warn", listener: (info: JSONRequestWarnInfo) => void): this
-
-  /** @deprecated avoid type ambiguity */
-  on(event: string, listener: (...args: unknown[]) => void): this
-  /** @deprecated avoid type ambiguity */
-  on(event: string, listener: (...args: any[]) => void): this
 }
 
 type JSONRequestWarnInfo = {

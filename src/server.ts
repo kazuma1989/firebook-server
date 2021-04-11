@@ -82,25 +82,23 @@ export class Server extends http.Server {
       })
     })
   }
-}
 
-export interface Server extends http.Server {
   on(event: "request", listener: (req: Request, resp: Response) => void): this
-
   on(
     event: RoutingEvent,
     listener: (req: Request, resp: Response) => void
   ): this
-
-  /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: unknown[]) => void): this
-  /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: any[]) => void): this
+  on(event: string, listener: (...args: any[]) => void): this {
+    return super.on(event, listener)
+  }
 
   emit(event: RoutingEvent, req: Request, resp: Response): boolean
-
-  /** @deprecated avoid type ambiguity */
   emit(event: string | symbol, ...args: any[]): boolean
+  emit(event: string | symbol, ...args: any[]): boolean {
+    return super.emit(event, ...args)
+  }
 }
 
 type RoutingEvent = `${METHODS} ${string}`

@@ -3,10 +3,31 @@ import * as http from "http"
 /**
  */
 export class Response extends http.ServerResponse {
+  constructor(req: http.IncomingMessage) {
+    super(req)
+  }
+
   /**
    * @param status
    * @param headers
    */
+  writeStatus(
+    status:
+      | "200 OK"
+      | "201 Created"
+      | "204 No Content"
+      | "400 Bad Request"
+      | "404 Not Found"
+      | "405 Method Not Allowed"
+      | "415 Unsupported Media Type"
+      | "500 Internal Server Error"
+      | "503 Service Unavailable",
+    headers?: OutgoingHttpHeaders
+  ): this
+  writeStatus(
+    status: `${number} ${string}`,
+    headers?: OutgoingHttpHeaders
+  ): this
   writeStatus(
     status: `${number} ${string}`,
     headers?: OutgoingHttpHeaders
@@ -23,9 +44,7 @@ export class Response extends http.ServerResponse {
 
     return this
   }
-}
 
-export interface Response extends http.ServerResponse {
   setHeader(
     name:
       | "Access-Control-Allow-Headers"
@@ -35,22 +54,9 @@ export interface Response extends http.ServerResponse {
       | "Content-Type"
       | "Location",
     value: number | string | ReadonlyArray<string>
-  ): void
-  setHeader(name: string, value: number | string | ReadonlyArray<string>): void
-
-  writeStatus(
-    status:
-      | "200 OK"
-      | "201 Created"
-      | "204 No Content"
-      | "400 Bad Request"
-      | "404 Not Found"
-      | "405 Method Not Allowed"
-      | "415 Unsupported Media Type"
-      | "500 Internal Server Error"
-      | "503 Service Unavailable",
-    headers?: OutgoingHttpHeaders
-  ): this
+  ): void {
+    super.setHeader(name, value)
+  }
 }
 
 interface OutgoingHttpHeaders extends http.OutgoingHttpHeaders {
