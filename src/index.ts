@@ -169,6 +169,20 @@ async function run() {
         })
       })
 
+      server.on("DELETE /storage/(?<file>.+)", async (req, resp) => {
+        const { file } = req.route?.pathParam ?? {}
+        if (!file) {
+          resp.writeStatus("204 No Content").end()
+          return
+        }
+
+        const filePath = path.join(storageDir, file)
+
+        await fs.promises.unlink(filePath).catch(() => null)
+
+        resp.writeStatus("204 No Content").end()
+      })
+
       //
       Object.keys(store.getState()).forEach((key) => {
         if (!key.match(/^[A-Za-z0-9_-]+$/i)) return
