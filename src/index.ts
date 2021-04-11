@@ -63,7 +63,16 @@ async function run() {
 
       // ロギング
       server.on("request", (req, resp) => {
-        console.log(`[${new Date().toJSON()}]`, req.method, req.url)
+        const { method, url } = req
+        resp.on("finish", function (this: typeof resp) {
+          console.log(
+            `[${new Date().toJSON()}]`,
+            this.statusCode,
+            this.statusMessage,
+            method,
+            url
+          )
+        })
 
         req.on("warn", (info) => {
           switch (info.type) {
@@ -81,6 +90,11 @@ async function run() {
         resp.setHeader("Access-Control-Allow-Methods", "*")
         resp.setHeader("Access-Control-Allow-Headers", "*")
         resp.setHeader("Access-Control-Expose-Headers", "*")
+
+        // プリフライトリクエストはすべて受け入れる。
+        if (req.method === "OPTIONS") {
+          resp.writeStatus("200 OK").end()
+        }
       })
 
       // storage ディレクトリの中身は静的ファイルとしてレスポンスする。
@@ -120,11 +134,6 @@ async function run() {
 
             resp.writeStatus("500 Internal Server Error").end()
           })
-      })
-
-      // TODO CORS 設定は一箇所にまとめたい
-      server.on("OPTIONS /storage", (req, resp) => {
-        resp.writeStatus("200 OK").end()
       })
 
       // ファイルアップロードのエンドポイント。

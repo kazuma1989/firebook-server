@@ -46,6 +46,8 @@ export class Server extends http.Server {
         .filter(nonNullable)
 
       this.on("request", (req, resp) => {
+        if (resp.headersSent || resp.finished) return
+
         try {
           if (!METHODS.includes(req.method as any)) {
             resp.writeStatus("405 Method Not Allowed").end()
