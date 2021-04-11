@@ -5,7 +5,7 @@ import { nonNullable } from "./util"
 
 /**
  * @example
- * const server = createServer()
+ * const server = new Server()
  *
  * server.on("request", (req, resp) => {
  *   console.log("request", req.url)
@@ -19,25 +19,28 @@ import { nonNullable } from "./util"
  *   console.log(`Server is listening at http://${host}:${port}`)
  * })
  */
-export function createServer(): Server {
-  return http
-    .createServer({
+export class Server extends http.Server {
+  constructor() {
+    super({
       IncomingMessage: JSONRequest,
       ServerResponse: JSONResponse,
     })
-    .once("listening", function setup(this: Server) {
+
+    this.once("listening", () => {
       const routes: Route[] = this.eventNames()
         .map((eventName) => {
           if (typeof eventName !== "string") return
 
-          const [method, rawPathPattern] = eventName.split(" ", 2)
-          if (!method || !METHODS.includes(method as any) || !rawPathPattern)
-            return
+          const method = METHODS.find((m) => eventName.startsWith(`${m} `))
+          if (!method) return
 
           return {
-            eventName,
+            eventName: eventName as `${METHODS} ${string}`,
             method,
-            pathPattern: new RegExp(`^${rawPathPattern}$`, "i"),
+            pathPattern: new RegExp(
+              `^${eventName.slice(method.length + 1)}$`,
+              "i"
+            ),
           }
         })
         .filter(nonNullable)
@@ -67,7 +70,7 @@ export function createServer(): Server {
             return
           }
 
-          this.emit(req.route.eventName, req, resp)
+          this.emit(req.route.eventName as RoutingEvent, req, resp)
         } catch (err: unknown) {
           console.error(err)
 
@@ -76,26 +79,32 @@ export function createServer(): Server {
         }
       })
     })
+  }
 }
 
-type RoutingEvent = `${METHODS} ${string}`
+export interface Server extends http.Server {
+  on(
+    event: "request",
+    listener: (req: JSONRequest, resp: JSONResponse) => void
+  ): this
 
-interface Server extends BaseServer<JSONRequest, JSONResponse, RoutingEvent> {}
-
-interface BaseServer<
-  ReqType extends http.IncomingMessage = http.IncomingMessage,
-  RespType extends http.ServerResponse = http.ServerResponse,
-  EventType extends string = string
-> extends http.Server {
-  on(event: "request", listener: (req: ReqType, resp: RespType) => void): this
-
-  on(event: EventType, listener: (req: ReqType, resp: RespType) => void): this
+  on(
+    event: RoutingEvent,
+    listener: (req: JSONRequest, resp: JSONResponse) => void
+  ): this
 
   /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: unknown[]) => void): this
   /** @deprecated avoid type ambiguity */
   on(event: string, listener: (...args: any[]) => void): this
+
+  emit(event: RoutingEvent, req: JSONRequest, resp: JSONResponse): boolean
+
+  /** @deprecated avoid type ambiguity */
+  emit(event: string | symbol, ...args: any[]): boolean
 }
+
+type RoutingEvent = `${METHODS} ${string}`
 
 const METHODS = [
   "DELETE",

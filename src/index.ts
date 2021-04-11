@@ -4,7 +4,7 @@ import { Writer } from "steno"
 import * as util from "util"
 import { helpMessage, parse } from "./cli-option"
 import { reducer } from "./reducer"
-import { createServer } from "./server"
+import { Server } from "./server"
 import { Store } from "./store"
 import { randomID } from "./util"
 import { watchFile } from "./watcher"
@@ -59,7 +59,7 @@ async function run() {
     }
 
     const start = async () => {
-      const server = createServer()
+      const server = new Server()
 
       // ロギング
       server.on("request", (req, resp) => {
