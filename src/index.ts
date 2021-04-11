@@ -169,10 +169,11 @@ async function run() {
         })
       })
 
+      // ファイル削除
       server.on("DELETE /storage/(?<file>.+)", async (req, resp) => {
         const { file } = req.route?.pathParam ?? {}
         if (!file) {
-          throw resp.InternalServerError
+          throw new Error()
         }
 
         const filePath = path.join(storageDir, path.normalize(file))

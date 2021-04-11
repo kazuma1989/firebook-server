@@ -80,7 +80,7 @@ export class Request extends http.IncomingMessage {
     const chunks: Buffer[] = []
     for await (const chunk of this) {
       if (!(chunk instanceof Buffer)) {
-        this.warn({
+        this._emit("warn", {
           type: "warn/chunk-is-not-a-buffer",
           message: "chunk is not a buffer",
           payload: chunk,
@@ -105,8 +105,9 @@ export class Request extends http.IncomingMessage {
     return super.on(event, listener)
   }
 
-  private warn(info: JSONRequestWarnInfo) {
-    this.emit("warn", info)
+  private _emit(event: "warn", info: JSONRequestWarnInfo): boolean
+  private _emit(event: string | symbol, ...args: any[]): boolean {
+    return this.emit(event, ...args)
   }
 }
 

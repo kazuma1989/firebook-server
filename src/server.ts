@@ -26,67 +26,8 @@ export class Server extends http.Server {
       ServerResponse: Response,
     })
 
-    // エラーをキャッチし損ねたときもハングアップせずに 500 Internal Server Error で応答する。
-    this.on("request", (req, resp) => {
-      const uncaughtException: NodeJS.UncaughtExceptionListener = (error) => {
-        if (error !== resp.InternalServerError) {
-          console.error("UNCAUGHT", error)
-        }
-
-        resp.writeStatus("500 Internal Server Error").end()
-      }
-      const unhandledRejection: NodeJS.UnhandledRejectionListener = (
-        reason,
-        promise
-      ) => {
-        if (reason !== resp.InternalServerError) {
-          console.error("UNHANDLED", reason)
-        }
-
-        resp.writeStatus("500 Internal Server Error").end()
-      }
-
-      process.once("uncaughtException", uncaughtException)
-      process.once("unhandledRejection", unhandledRejection)
-
-      resp.on("finish", () => {
-        process.off("uncaughtException", uncaughtException)
-        process.off("unhandledRejection", unhandledRejection)
-      })
-    })
-
     this.once("listening", () => {
-      const routes: Route[] = this.eventNames()
-        .map((eventName) => {
-          debuglog("installing route:", eventName)
-
-          if (typeof eventName !== "string") return
-
-          const method = METHODS.find((m) => eventName.startsWith(`${m} `))
-          if (!method) return
-
-          let pathPattern: RegExp
-          try {
-            pathPattern = new RegExp(
-              `^${eventName.slice(method.length + 1)}$`,
-              "i"
-            )
-          } catch (error: unknown) {
-            if (error instanceof Error) {
-              console.error("WARN", error.message)
-            }
-
-            console.error("failed to install", eventName)
-            return
-          }
-
-          return {
-            eventName: eventName as `${METHODS} ${string}`,
-            method,
-            pathPattern,
-          }
-        })
-        .filter(nonNullable)
+      const routes = this.routes()
 
       this.on("request", (req, resp) => {
         if (resp.headersSent || resp.finished) {
@@ -118,7 +59,7 @@ export class Server extends http.Server {
             return
           }
 
-          this.emit(req.route.eventName as RoutingEvent, req, resp)
+          this._emit(req.route.eventName as RoutingEvent, req, resp)
         } catch (err: unknown) {
           console.error(err)
 
@@ -127,10 +68,36 @@ export class Server extends http.Server {
         }
       })
     })
+
+    // エラーをキャッチし損ねたときもハングアップせずに 500 Internal Server Error で応答する。
+    this.on("request", (req, resp) => {
+      const uncaughtException: NodeJS.UncaughtExceptionListener &
+        NodeJS.UnhandledRejectionListener = (error: unknown) => {
+        try {
+          console.error("UNCAUGHT", error)
+
+          resp.writeStatus("500 Internal Server Error")
+        } catch (error: unknown) {
+          console.error(error)
+        } finally {
+          // this emits "finish" event and it will remove listeners.
+          resp.end()
+        }
+      }
+
+      process.once("uncaughtException", uncaughtException)
+      process.once("unhandledRejection", uncaughtException)
+
+      resp.on("finish", () => {
+        debuglog("removing uncaughtException and unhandledRejection listeners")
+
+        process.off("uncaughtException", uncaughtException)
+        process.off("unhandledRejection", uncaughtException)
+      })
+    })
   }
 
   on(event: "request", listener: (req: Request, resp: Response) => void): this
-  on(event: "uncaught", listener: (req: Request, resp: Response) => void): this
   on(
     event: RoutingEvent,
     listener: (req: Request, resp: Response) => void
@@ -141,11 +108,43 @@ export class Server extends http.Server {
     return super.on(event, listener)
   }
 
-  emit(event: "uncaught", req: Request, resp: Response): boolean
-  emit(event: RoutingEvent, req: Request, resp: Response): boolean
-  emit(event: string | symbol, ...args: any[]): boolean
-  emit(event: string | symbol, ...args: any[]): boolean {
-    return super.emit(event, ...args)
+  private _emit(event: RoutingEvent, req: Request, resp: Response): boolean
+  private _emit(event: string | symbol, ...args: any[]): boolean {
+    return this.emit(event, ...args)
+  }
+
+  private routes(): Route[] {
+    return this.eventNames()
+      .map((eventName) => {
+        debuglog("installing route:", eventName)
+
+        if (typeof eventName !== "string") return
+
+        const method = METHODS.find((m) => eventName.startsWith(`${m} `))
+        if (!method) return
+
+        let pathPattern: RegExp
+        try {
+          pathPattern = new RegExp(
+            `^${eventName.slice(method.length + 1)}$`,
+            "i"
+          )
+        } catch (error: unknown) {
+          if (error instanceof Error) {
+            console.error("WARN", error.message)
+          }
+
+          console.error("failed to install", eventName)
+          return
+        }
+
+        return {
+          eventName: eventName as `${METHODS} ${string}`,
+          method,
+          pathPattern,
+        }
+      })
+      .filter(nonNullable)
   }
 }
 

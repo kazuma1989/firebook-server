@@ -3,8 +3,6 @@ import * as http from "http"
 /**
  */
 export class Response extends http.ServerResponse {
-  readonly InternalServerError = new Error("500 Internal Server Error")
-
   /**
    * @param status
    * @param headers
