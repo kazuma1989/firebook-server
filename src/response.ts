@@ -38,19 +38,20 @@ export interface JSONResponse extends http.ServerResponse {
   ): void
   setHeader(name: string, value: number | string | ReadonlyArray<string>): void
 
-  writeStatus(status: STATUS, headers?: OutgoingHttpHeaders): this
+  writeStatus(
+    status:
+      | "200 OK"
+      | "201 Created"
+      | "204 No Content"
+      | "400 Bad Request"
+      | "404 Not Found"
+      | "405 Method Not Allowed"
+      | "415 Unsupported Media Type"
+      | "500 Internal Server Error"
+      | "503 Service Unavailable",
+    headers?: OutgoingHttpHeaders
+  ): this
 }
-
-type STATUS =
-  | "200 OK"
-  | "201 Created"
-  | "204 No Content"
-  | "400 Bad Request"
-  | "404 Not Found"
-  | "405 Method Not Allowed"
-  | "415 Unsupported Media Type"
-  | "500 Internal Server Error"
-  | "503 Service Unavailable"
 
 interface OutgoingHttpHeaders extends http.OutgoingHttpHeaders {
   "Content-Type"?: "application/json"

@@ -32,7 +32,7 @@ export class JSONRequest extends http.IncomingMessage {
    * // parameters = ["param=\"a", "b\""]
    * ```
    */
-  setup(): boolean {
+  setup(): void {
     const [mimeType, ...parameters] =
       this.headers["content-type"]?.split(";").map((v) => v.trim()) ?? []
 
@@ -43,12 +43,6 @@ export class JSONRequest extends http.IncomingMessage {
       path.posix.normalize(this.url),
       `http://${this.headers.host}`
     )
-
-    if (!METHODS.includes(this.method)) {
-      return false
-    }
-
-    return true
   }
 
   /**
@@ -104,7 +98,7 @@ export class JSONRequest extends http.IncomingMessage {
 }
 
 export interface JSONRequest extends http.IncomingMessage {
-  method: METHODS
+  method: string
   url: string
 
   on(event: "warn", listener: (info: JSONRequestWarnInfo) => void): this
@@ -121,18 +115,6 @@ type JSONRequestWarnInfo = {
   payload?: unknown
 }
 
-export const METHODS = [
-  "DELETE",
-  "HEAD",
-  "GET",
-  "OPTIONS",
-  "PATCH",
-  "POST",
-  "PUT",
-] as const
-
-export type METHODS = typeof METHODS[number]
-
 export interface Route {
   /** @example "GET /foo/(?<id>.+)" */
   eventName: string
@@ -140,14 +122,11 @@ export interface Route {
   /** @example "GET" */
   method: string
 
-  /** RegExp object which represents `eventName`. Case insensitive */
+  /** @example RegExp("^/foo/(?<id>.+)$", "i") */
   pathPattern: RegExp
 }
 
 export interface MatchingRoute extends Route {
-  /** @example "GET" */
-  method: METHODS
-
   /** RegExp matching groups for `pathPattern` */
   pathParam: {
     [key: string]: string

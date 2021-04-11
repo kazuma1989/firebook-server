@@ -13,3 +13,10 @@ export function randomID() {
 
   return id
 }
+
+/**
+ * null または undefined でないことを型的にも保証する。
+ */
+export function nonNullable<T>(value: T): value is NonNullable<T> {
+  return value !== null && value !== undefined
+}
