@@ -41,12 +41,6 @@ async function run() {
     )
 
     const watcher = watchFile(databaseFile)
-    watcher.on("changed", async (content) => {
-      store = new Store(reducer, JSON.parse(content))
-
-      server.close()
-      server = await start()
-    })
     watcher.prevContent = initialDatabaseContent
 
     const writer = new Writer(databaseFile)
@@ -58,7 +52,7 @@ async function run() {
       await writer.write(content)
     }
 
-    const start = async () => {
+    while (true) {
       const server = new Server()
 
       // ロギング
@@ -377,13 +371,23 @@ async function run() {
       })
 
       // listen
-      return server.listen(option.port, option.hostname, () => {
+      server.listen(option.port, option.hostname, () => {
         console.log(`${PACKAGE_NAME} v${PACKAGE_VERSION}`)
         console.log(`http://${option.hostname}:${option.port}`)
       })
-    }
 
-    let server = await start()
+      const content = await new Promise<string>((resolve) => {
+        watcher.once("changed", (content) => {
+          resolve(content)
+        })
+      })
+
+      store = new Store(reducer, JSON.parse(content))
+
+      server.close()
+
+      console.log("Restarting...")
+    }
   } catch (err: unknown) {
     console.error(err)
 
