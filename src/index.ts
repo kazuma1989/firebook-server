@@ -31,28 +31,34 @@ async function run() {
     const storageDir = path.resolve(process.cwd(), option.storage)
     const databaseFile = path.resolve(process.cwd(), option.database)
 
-    const initialDatabaseContent = (
-      await fs.promises.readFile(databaseFile)
-    ).toString()
-
-    let store = new Store(
-      reducer,
-      JSON.parse(initialDatabaseContent) as ReturnType<typeof reducer>
-    )
-
-    const watcher = watchFile(databaseFile)
-    watcher.prevContent = initialDatabaseContent
-
     const writer = new Writer(databaseFile)
-    const write = async () => {
-      const content = JSON.stringify(store.getState(), null, 2) + "\n"
 
-      watcher.prevContent = content
-
-      await writer.write(content)
-    }
+    let databaseContent = (await fs.promises.readFile(databaseFile)).toString()
 
     while (true) {
+      const store = new Store(
+        reducer,
+        JSON.parse(databaseContent) as ReturnType<typeof reducer>
+      )
+
+      const watcher = watchFile(databaseFile)
+      watcher.prevContent = databaseContent
+
+      const databaseChanged$ = new Promise<void>((resolve) => {
+        watcher.once("changed", (content) => {
+          databaseContent = content
+          resolve()
+        })
+      })
+
+      const write = async () => {
+        const content = JSON.stringify(store.getState(), null, 2) + "\n"
+
+        watcher.prevContent = content
+
+        await writer.write(content)
+      }
+
       const server = new Server()
 
       // ロギング
@@ -376,13 +382,7 @@ async function run() {
         console.log(`http://${option.hostname}:${option.port}`)
       })
 
-      const content = await new Promise<string>((resolve) => {
-        watcher.once("changed", (content) => {
-          resolve(content)
-        })
-      })
-
-      store = new Store(reducer, JSON.parse(content))
+      await databaseChanged$
 
       server.close()
 
