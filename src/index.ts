@@ -36,20 +36,22 @@ async function run() {
     let databaseContent = (await fs.promises.readFile(databaseFile)).toString()
 
     while (true) {
-      const store = new Store(
-        reducer,
-        JSON.parse(databaseContent) as ReturnType<typeof reducer>
-      )
-
       const watcher = watchFile(databaseFile)
       watcher.prevContent = databaseContent
 
       const databaseChanged$ = new Promise<void>((resolve) => {
         watcher.once("changed", (content) => {
-          databaseContent = content
           resolve()
+
+          watcher.close()
+          databaseContent = content
         })
       })
+
+      const store = new Store(
+        reducer,
+        JSON.parse(databaseContent) as ReturnType<typeof reducer>
+      )
 
       const write = async () => {
         const content = JSON.stringify(store.getState(), null, 2) + "\n"

@@ -29,6 +29,10 @@ export function watchFile(filePath: string): Watcher {
 
   return fs.watch(
     dirPath,
+    {
+      // Watcher が残っていることを理由にプロセスが終わらない状態に陥るのを避ける。
+      persistent: false,
+    },
     async function (
       this: Watcher,
       event: "rename" | "change",
