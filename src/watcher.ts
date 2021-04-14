@@ -5,18 +5,18 @@ interface Watcher extends fs.FSWatcher {
   prevContent?: string
 
   // changed
-  on(event: "changed", listener: (data: string) => void): this
-  emit(event: "changed", data: string): boolean
+  once(event: "changed", listener: (content: string) => void): this
+  emit(event: "changed", content: string): boolean
 
   // warn
   on(event: "warn", listener: (err: unknown) => void): this
   emit(event: "warn", err: unknown): boolean
 
-  // general
-  on(event: string, listener: (...args: unknown[]) => void): this
-  on(event: string, listener: (...args: any[]) => void): this
-
-  emit(event: string, ...args: any[]): boolean
+  // undefined events
+  on(event: never, listener: (...args: any[]) => void): this
+  once(event: never, listener: (...args: any[]) => void): this
+  off(event: never, listener: (...args: any[]) => void): this
+  emit(event: never, ...args: any[]): boolean
 }
 
 export function watchFile(filePath: string): Watcher {
@@ -24,6 +24,10 @@ export function watchFile(filePath: string): Watcher {
 
   return fs.watch(
     dirPath,
+    {
+      // Watcher が残っていることを理由にプロセスが終わらない状態に陥るのを避ける。
+      persistent: false,
+    },
     async function (
       this: Watcher,
       event: "rename" | "change",

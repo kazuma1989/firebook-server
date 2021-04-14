@@ -1,7 +1,7 @@
 import * as http from "http"
-import { Request, Route } from "./request"
+import { Request } from "./request"
 import { Response } from "./response"
-import { debuglog, nonNullable } from "./util"
+import { debuglog } from "./util"
 
 /**
  * @example
@@ -19,6 +19,44 @@ import { debuglog, nonNullable } from "./util"
  *   console.log(`Server is listening at http://${host}:${port}`)
  * })
  */
+export interface Server {
+  // newListener / removeListener
+  on(
+    event: "newListener" | "removeListener",
+    listener: (event: string, listener: (...args: any[]) => void) => void
+  ): () => void
+  off(
+    event: "newListener" | "removeListener",
+    listener: (event: string, listener: (...args: any[]) => void) => void
+  ): () => void
+
+  // request
+  on(event: "request", listener: (req: Request, resp: Response) => void): this
+  off(event: "request", listener: (req: Request, resp: Response) => void): this
+
+  // routing events
+  on<P extends { [key: string]: string } = {}>(
+    event: RoutingEvent,
+    listener: (req: Request, resp: Response, route: Route<P>) => void
+  ): this
+  off<P extends { [key: string]: string } = {}>(
+    event: RoutingEvent,
+    listener: (req: Request, resp: Response, route: Route<P>) => void
+  ): this
+  emit<P extends { [key: string]: string } = {}>(
+    event: RoutingEvent,
+    req: Request,
+    resp: Response,
+    route: Route<P>
+  ): boolean
+
+  // undefined events
+  on(event: never, listener: (...args: any[]) => void): this
+  once(event: never, listener: (...args: any[]) => void): this
+  off(event: never, listener: (...args: any[]) => void): this
+  emit(event: never, ...args: any[]): boolean
+}
+
 export class Server extends http.Server {
   constructor() {
     super({
@@ -26,47 +64,95 @@ export class Server extends http.Server {
       ServerResponse: Response,
     })
 
-    this.once("listening", () => {
-      const routes = this.routes()
+    this.setMaxListeners(1_000)
 
-      this.on("request", (req, resp) => {
-        if (resp.headersSent || resp.finished) {
-          debuglog("headers sent or response finished")
+    this.on("request", (req, resp) => {
+      if (!(METHODS as readonly string[]).includes(req.method)) {
+        resp.writeStatus("405 Method Not Allowed").end()
+        return
+      }
+
+      try {
+        req.emit("setup")
+      } catch (err: unknown) {
+        if ((err as any).code === "ERR_INVALID_URL") {
+          resp.writeStatus("400 Invalid Host header").end()
           return
         }
 
-        try {
-          if (!METHODS.includes(req.method as any)) {
-            resp.writeStatus("405 Method Not Allowed").end()
-            return
-          }
+        throw err
+      }
+    })
 
-          try {
-            req.setup()
-          } catch (err: unknown) {
-            if ((err as any).code === "ERR_INVALID_URL") {
-              resp.writeStatus("400 Invalid Host header").end()
+    let totalRoutes = 0
+    const skippedRoutes = new WeakMap<Response, number>()
+
+    this.on("newListener", (eventName, listener) => {
+      const method = METHODS.find((m) => eventName.startsWith(`${m} `))
+      if (!method) return
+
+      const routeName = eventName as `${METHODS} ${string}`
+
+      let pathPattern: RegExp
+      try {
+        // GET /assets/(?<file>.+) -> new RegExp("^/assets/(?<file>.+)$", "i")
+        pathPattern = new RegExp(`^${routeName.slice(method.length + 1)}$`, "i")
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          console.error("WARN", error.message)
+        }
+
+        console.error("failed to install", routeName)
+        return
+      }
+
+      debuglog("installing route:", routeName)
+
+      const onRoute = (req: Request, resp: Response): void => {
+        if (req.method === method) {
+          const match = req.normalizedURL?.pathname.match(pathPattern)
+
+          if (match) {
+            if (resp.headersSent || resp.finished) {
+              debuglog("%s: headers sent or response finished", eventName)
               return
             }
 
-            throw err
-          }
-
-          req.match(routes)
-
-          if (!req.route) {
-            resp.writeStatus("404 Not Found").end()
+            this.emit(routeName, req, resp, {
+              routeName,
+              method,
+              pathPattern,
+              pathParam: match.groups ?? {},
+            })
             return
           }
-
-          this._emit(req.route.eventName as RoutingEvent, req, resp)
-        } catch (err: unknown) {
-          console.error(err)
-
-          resp.writeStatus("500 Internal Server Error").end()
-          return
         }
-      })
+
+        // マッチしなかったらカウントを増やす。
+        // リスナー総数と同じになったらそれは 404 を意味する。
+        skippedRoutes.set(resp, (skippedRoutes.get(resp) ?? 0) + 1)
+        if (skippedRoutes.get(resp)! >= totalRoutes) {
+          resp.writeStatus("404 Not Found").end()
+        }
+      }
+      this.on("request", onRoute)
+      totalRoutes += 1
+
+      const onRemoveListener = (
+        _eventName: string,
+        _listener: (...args: any[]) => void
+      ) => {
+        if (_eventName !== eventName) return
+        if (_listener !== listener) return
+
+        debuglog("uninstalling route:", _eventName)
+
+        this.off("request", onRoute)
+        totalRoutes -= 1
+
+        this.off("removeListener", onRemoveListener)
+      }
+      this.on("removeListener", onRemoveListener)
     })
 
     // エラーをキャッチし損ねたときもハングアップせずに 500 Internal Server Error で応答する。
@@ -76,7 +162,11 @@ export class Server extends http.Server {
         try {
           console.error("UNCAUGHT", error)
 
-          resp.writeStatus("500 Internal Server Error")
+          if (resp.headersSent || resp.finished) {
+            debuglog("headers sent or response finished")
+          } else {
+            resp.writeStatus("500 Internal Server Error")
+          }
         } catch (error: unknown) {
           console.error(error)
         } finally {
@@ -88,63 +178,13 @@ export class Server extends http.Server {
       process.once("uncaughtException", uncaughtException)
       process.once("unhandledRejection", uncaughtException)
 
-      resp.on("finish", () => {
+      resp.once("finish", () => {
         debuglog("removing uncaughtException and unhandledRejection listeners")
 
         process.off("uncaughtException", uncaughtException)
         process.off("unhandledRejection", uncaughtException)
       })
     })
-  }
-
-  on(event: "request", listener: (req: Request, resp: Response) => void): this
-  on(
-    event: RoutingEvent,
-    listener: (req: Request, resp: Response) => void
-  ): this
-  on(event: string, listener: (...args: unknown[]) => void): this
-  on(event: string, listener: (...args: any[]) => void): this
-  on(event: string, listener: (...args: any[]) => void): this {
-    return super.on(event, listener)
-  }
-
-  private _emit(event: RoutingEvent, req: Request, resp: Response): boolean
-  private _emit(event: string | symbol, ...args: any[]): boolean {
-    return this.emit(event, ...args)
-  }
-
-  private routes(): Route[] {
-    return this.eventNames()
-      .map((eventName) => {
-        debuglog("installing route:", eventName)
-
-        if (typeof eventName !== "string") return
-
-        const method = METHODS.find((m) => eventName.startsWith(`${m} `))
-        if (!method) return
-
-        let pathPattern: RegExp
-        try {
-          pathPattern = new RegExp(
-            `^${eventName.slice(method.length + 1)}$`,
-            "i"
-          )
-        } catch (error: unknown) {
-          if (error instanceof Error) {
-            console.error("WARN", error.message)
-          }
-
-          console.error("failed to install", eventName)
-          return
-        }
-
-        return {
-          eventName: eventName as `${METHODS} ${string}`,
-          method,
-          pathPattern,
-        }
-      })
-      .filter(nonNullable)
   }
 }
 
@@ -161,3 +201,17 @@ const METHODS = [
 ] as const
 
 type METHODS = typeof METHODS[number]
+
+interface Route<TPathParam extends { [key: string]: string } = {}> {
+  /** @example "GET /foo/(?<id>.+)" */
+  routeName: RoutingEvent
+
+  /** @example "GET" */
+  method: METHODS
+
+  /** @example RegExp("^/foo/(?<id>.+)$", "i") */
+  pathPattern: RegExp
+
+  /** RegExp matching groups for `pathPattern` */
+  pathParam: TPathParam
+}

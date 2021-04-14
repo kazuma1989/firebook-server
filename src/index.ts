@@ -1,12 +1,11 @@
 import * as fs from "fs"
 import * as path from "path"
 import { Writer } from "steno"
-import * as util from "util"
 import { helpMessage, parse } from "./cli-option"
 import { reducer } from "./reducer"
 import { Server } from "./server"
 import { Store } from "./store"
-import { randomID } from "./util"
+import { assertIsDefined, randomID } from "./util"
 import { watchFile } from "./watcher"
 
 /**
@@ -31,42 +30,45 @@ async function run() {
     const storageDir = path.resolve(process.cwd(), option.storage)
     const databaseFile = path.resolve(process.cwd(), option.database)
 
-    const initialDatabaseContent = (
-      await fs.promises.readFile(databaseFile)
-    ).toString()
-
-    let store = new Store(
-      reducer,
-      JSON.parse(initialDatabaseContent) as ReturnType<typeof reducer>
-    )
-
-    const watcher = watchFile(databaseFile)
-    watcher.on("changed", async (content) => {
-      store = new Store(reducer, JSON.parse(content))
-
-      server.close()
-      server = await start()
-    })
-    watcher.prevContent = initialDatabaseContent
-
     const writer = new Writer(databaseFile)
-    const write = async () => {
-      const content = JSON.stringify(store.getState(), null, 2) + "\n"
 
-      watcher.prevContent = content
+    let databaseContent = (await fs.promises.readFile(databaseFile)).toString()
 
-      await writer.write(content)
-    }
+    while (true) {
+      const watcher = watchFile(databaseFile)
+      watcher.prevContent = databaseContent
 
-    const start = async () => {
+      const databaseChanged$ = new Promise<void>((resolve) => {
+        watcher.once("changed", (content) => {
+          resolve()
+
+          watcher.close()
+          databaseContent = content
+        })
+      })
+
+      const database = new Store(
+        reducer,
+        JSON.parse(databaseContent) as ReturnType<typeof reducer>
+      )
+
+      const write = async () => {
+        const content = JSON.stringify(database.getState(), null, 2) + "\n"
+
+        watcher.prevContent = content
+
+        await writer.write(content)
+      }
+
       const server = new Server()
 
       // ロギング
       server.on("request", (req, resp) => {
         const { method, url } = req
-        resp.on("finish", function (this: typeof resp) {
+        resp.once("finish", function (this: typeof resp) {
           console.log(
-            `[${new Date().toJSON()}]`,
+            "[%s] %d %s %s %s",
+            new Date().toJSON(),
             this.statusCode,
             this.statusMessage,
             method,
@@ -77,7 +79,7 @@ async function run() {
         req.on("warn", (info) => {
           switch (info.type) {
             case "warn/chunk-is-not-a-buffer": {
-              console.warn(info.message, util.inspect(info.payload))
+              console.warn("%s %O", info.message, info.payload)
               break
             }
           }
@@ -97,54 +99,38 @@ async function run() {
         }
       })
 
+      const mimeTypes: Record<string, string> = {
+        ".png": "image/png",
+        ".jpg": "image/jpg",
+        ".jpeg": "image/jpg",
+        ".gif": "image/gif",
+      }
+
       // storage ディレクトリの中身は静的ファイルとしてレスポンスする。
-      server.on("GET /storage/(?<file>.+)", (req, resp) => {
-        const { file } = req.route?.pathParam ?? {}
-        if (!file) {
-          resp.writeStatus("404 Not Found").end()
-          return
+      server.on<{ file: string }>(
+        "GET /storage/(?<file>.+)",
+        (req, resp, { pathParam: { file } }) => {
+          const filePath = path.join(storageDir, path.normalize(file))
+          const mimeType = mimeTypes[path.extname(filePath).toLowerCase()]
+
+          fs.createReadStream(filePath)
+            .once("error", (err) => {
+              console.error(err)
+
+              resp.writeStatus("404 Not Found").end()
+            })
+            .once("open", () => {
+              resp.setHeader(
+                "Content-Type",
+                mimeType ?? "application/octet-stream"
+              )
+            })
+            .pipe(resp)
         }
-
-        const mimeTypes = {
-          ".png": "image/png",
-          ".jpg": "image/jpg",
-          ".jpeg": "image/jpg",
-          ".gif": "image/gif",
-        }
-
-        const filePath = path.join(storageDir, path.normalize(file))
-
-        fs.createReadStream(filePath)
-          .on("error", () => {
-            resp.writeStatus("404 Not Found").end()
-          })
-          .once("open", () => {
-            resp.setHeader(
-              "Content-Type",
-              mimeTypes[path.extname(filePath).toLowerCase()] ??
-                "application/octet-stream"
-            )
-          })
-          .pipe(resp)
-          .on("finish", () => {
-            resp.end()
-          })
-          .on("error", (err) => {
-            console.error(err)
-
-            resp.writeStatus("500 Internal Server Error").end()
-          })
-      })
+      )
 
       // ファイルアップロードのエンドポイント。
       server.on("POST /storage", async (req, resp) => {
-        const mimeTypes = {
-          ".png": "image/png",
-          ".jpg": "image/jpg",
-          ".jpeg": "image/jpg",
-          ".gif": "image/gif",
-        }
-
         const [ext] =
           Object.entries(mimeTypes).find(([, type]) => type === req.mimeType) ??
           []
@@ -156,9 +142,9 @@ async function run() {
         const filePath = path.join(storageDir, `${randomID()}${ext}`)
 
         req.pipe(fs.createWriteStream(filePath)).on("close", () => {
-          const origin = `http://${
-            req.headers.host ?? `${option.hostname}:${option.port}`
-          }`
+          const origin =
+            req.normalizedURL?.origin ??
+            `http://${option.hostname}:${option.port}`
           const downloadURL = `${origin}/storage/${path.basename(filePath)}`
 
           resp
@@ -170,26 +156,25 @@ async function run() {
       })
 
       // ファイル削除
-      server.on("DELETE /storage/(?<file>.+)", async (req, resp) => {
-        const { file } = req.route?.pathParam ?? {}
-        if (!file) {
-          throw new Error()
+      server.on<{ file: string }>(
+        "DELETE /storage/(?<file>.+)",
+        async (req, resp, { pathParam: { file } }) => {
+          const filePath = path.join(storageDir, path.normalize(file))
+
+          await fs.promises.unlink(filePath).catch(() => null)
+
+          resp.writeStatus("204 No Content").end()
         }
+      )
 
-        const filePath = path.join(storageDir, path.normalize(file))
-
-        await fs.promises.unlink(filePath).catch(() => null)
-
-        resp.writeStatus("204 No Content").end()
-      })
-
-      //
-      Object.keys(store.getState()).forEach((key) => {
-        if (!key.match(/^[A-Za-z0-9_-]+$/i)) return
-
+      // データベースの REST 操作
+      const tableKeys = Object.keys(database.getState()).filter(
+        RegExp.prototype.test.bind(/^[A-Za-z0-9_-]+$/)
+      )
+      tableKeys.forEach((key) => {
         // GET all
         server.on(`GET /${key}` as "GET /key", (req, resp) => {
-          const items = store.getState()[key]
+          const items = database.getState()[key]
           if (!items) {
             resp.writeStatus("404 Not Found").end()
             return
@@ -203,21 +188,22 @@ async function run() {
         })
 
         // GET single
-        server.on(`GET /${key}/(?<id>.+)` as "GET /key/:id", (req, resp) => {
-          const { id } = req.route?.pathParam ?? {}
+        server.on<{ id: string }>(
+          `GET /${key}/(?<id>.+)` as "GET /key/:id",
+          (req, resp, { pathParam: { id } }) => {
+            const item = database.getState()[key]?.find((i) => i.id === id)
+            if (!item) {
+              resp.writeStatus("404 Not Found").end()
+              return
+            }
 
-          const item = store.getState()[key]?.find((v) => v.id === id)
-          if (!item) {
-            resp.writeStatus("404 Not Found").end()
-            return
+            resp
+              .writeStatus("200 OK", {
+                "Content-Type": "application/json",
+              })
+              .end(stringify(item))
           }
-
-          resp
-            .writeStatus("200 OK", {
-              "Content-Type": "application/json",
-            })
-            .end(stringify(item))
-        })
+        )
 
         // POST
         server.on(`POST /${key}` as "POST /key", async (req, resp) => {
@@ -228,13 +214,13 @@ async function run() {
 
           const body = await req.parseBodyAsJSONObject().catch(() => null)
           if (!body) {
-            resp.writeStatus("400 Malformed JSON input").end()
+            resp.writeStatus("400 Malformed JSON Input").end()
             return
           }
 
           const id = randomID()
 
-          store.dispatch({
+          database.dispatch({
             type: "POST /key",
             payload: {
               key,
@@ -243,11 +229,8 @@ async function run() {
             },
           })
 
-          const item = store.getState()[key]?.find((i) => i.id === id)
-          if (!item) {
-            resp.writeStatus("500 Internal Server Error").end()
-            return
-          }
+          const item = database.getState()[key]?.find((i) => i.id === id)
+          assertIsDefined(item)
 
           await write()
 
@@ -260,15 +243,9 @@ async function run() {
         })
 
         // PUT
-        server.on(
+        server.on<{ id: string }>(
           `PUT /${key}/(?<id>.+)` as "PUT /key/:id",
-          async (req, resp) => {
-            const { id } = req.route?.pathParam ?? {}
-            if (!id) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
-
+          async (req, resp, { pathParam: { id } }) => {
             if (req.mimeType !== "application/json") {
               resp.writeStatus("415 Unsupported Media Type").end()
               return
@@ -276,11 +253,11 @@ async function run() {
 
             const body = await req.parseBodyAsJSONObject().catch(() => null)
             if (!body) {
-              resp.writeStatus("400 Malformed JSON input").end()
+              resp.writeStatus("400 Malformed JSON Input").end()
               return
             }
 
-            store.dispatch({
+            database.dispatch({
               type: "PUT /key/:id",
               payload: {
                 key,
@@ -289,11 +266,8 @@ async function run() {
               },
             })
 
-            const item = store.getState()[key]?.find((i) => i.id === id)
-            if (!item) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
+            const item = database.getState()[key]?.find((i) => i.id === id)
+            assertIsDefined(item)
 
             await write()
 
@@ -306,15 +280,9 @@ async function run() {
         )
 
         // PATCH
-        server.on(
+        server.on<{ id: string }>(
           `PATCH /${key}/(?<id>.+)` as "PATCH /key/:id",
-          async (req, resp) => {
-            const { id } = req.route?.pathParam ?? {}
-            if (!id) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
-
+          async (req, resp, { pathParam: { id } }) => {
             if (req.mimeType !== "application/json") {
               resp.writeStatus("415 Unsupported Media Type").end()
               return
@@ -322,11 +290,11 @@ async function run() {
 
             const body = await req.parseBodyAsJSONObject().catch(() => null)
             if (!body) {
-              resp.writeStatus("400 Bad Request").end()
+              resp.writeStatus("400 Malformed JSON Input").end()
               return
             }
 
-            store.dispatch({
+            database.dispatch({
               type: "PATCH /key/:id",
               payload: {
                 key,
@@ -335,11 +303,8 @@ async function run() {
               },
             })
 
-            const item = store.getState()[key]?.find((i) => i.id === id)
-            if (!item) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
+            const item = database.getState()[key]?.find((i) => i.id === id)
+            assertIsDefined(item)
 
             await write()
 
@@ -352,16 +317,10 @@ async function run() {
         )
 
         // DELETE
-        server.on(
+        server.on<{ id: string }>(
           `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
-          async (req, resp) => {
-            const { id } = req.route?.pathParam ?? {}
-            if (!id) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
-
-            store.dispatch({
+          async (req, resp, { pathParam: { id } }) => {
+            database.dispatch({
               type: "DELETE /key/:id",
               payload: {
                 key,
@@ -377,13 +336,17 @@ async function run() {
       })
 
       // listen
-      return server.listen(option.port, option.hostname, () => {
+      server.listen(option.port, option.hostname, () => {
         console.log(`${PACKAGE_NAME} v${PACKAGE_VERSION}`)
         console.log(`http://${option.hostname}:${option.port}`)
       })
-    }
 
-    let server = await start()
+      await databaseChanged$
+
+      server.close()
+
+      console.log("Restarting...")
+    }
   } catch (err: unknown) {
     console.error(err)
 
