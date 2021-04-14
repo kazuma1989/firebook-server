@@ -100,43 +100,34 @@ async function run() {
       })
 
       // storage ディレクトリの中身は静的ファイルとしてレスポンスする。
-      server.on("GET /storage/(?<file>.+)", (req, resp) => {
-        const { file } = req.route?.pathParam ?? {}
-        if (!file) {
-          resp.writeStatus("404 Not Found").end()
-          return
+      server.on<{ file: string }>(
+        "GET /storage/(?<file>.+)",
+        (req, resp, { pathParam: { file } }) => {
+          const mimeTypes = {
+            ".png": "image/png",
+            ".jpg": "image/jpg",
+            ".jpeg": "image/jpg",
+            ".gif": "image/gif",
+          }
+
+          const filePath = path.join(storageDir, path.normalize(file))
+
+          fs.createReadStream(filePath)
+            .once("error", (err) => {
+              console.error(err)
+
+              resp.writeStatus("404 Not Found").end()
+            })
+            .once("open", () => {
+              resp.setHeader(
+                "Content-Type",
+                mimeTypes[path.extname(filePath).toLowerCase()] ??
+                  "application/octet-stream"
+              )
+            })
+            .pipe(resp)
         }
-
-        const mimeTypes = {
-          ".png": "image/png",
-          ".jpg": "image/jpg",
-          ".jpeg": "image/jpg",
-          ".gif": "image/gif",
-        }
-
-        const filePath = path.join(storageDir, path.normalize(file))
-
-        fs.createReadStream(filePath)
-          .once("error", () => {
-            resp.writeStatus("404 Not Found").end()
-          })
-          .once("open", () => {
-            resp.setHeader(
-              "Content-Type",
-              mimeTypes[path.extname(filePath).toLowerCase()] ??
-                "application/octet-stream"
-            )
-          })
-          .pipe(resp)
-          .once("finish", () => {
-            resp.end()
-          })
-          .once("error", (err) => {
-            console.error(err)
-
-            resp.writeStatus("500 Internal Server Error").end()
-          })
-      })
+      )
 
       // ファイルアップロードのエンドポイント。
       server.on("POST /storage", async (req, resp) => {
@@ -172,18 +163,16 @@ async function run() {
       })
 
       // ファイル削除
-      server.on("DELETE /storage/(?<file>.+)", async (req, resp) => {
-        const { file } = req.route?.pathParam ?? {}
-        if (!file) {
-          throw new Error()
+      server.on<{ file: string }>(
+        "DELETE /storage/(?<file>.+)",
+        async (req, resp, { pathParam: { file } }) => {
+          const filePath = path.join(storageDir, path.normalize(file))
+
+          await fs.promises.unlink(filePath).catch(() => null)
+
+          resp.writeStatus("204 No Content").end()
         }
-
-        const filePath = path.join(storageDir, path.normalize(file))
-
-        await fs.promises.unlink(filePath).catch(() => null)
-
-        resp.writeStatus("204 No Content").end()
-      })
+      )
 
       //
       Object.keys(store.getState()).forEach((key) => {
@@ -205,21 +194,22 @@ async function run() {
         })
 
         // GET single
-        server.on(`GET /${key}/(?<id>.+)` as "GET /key/:id", (req, resp) => {
-          const { id } = req.route?.pathParam ?? {}
+        server.on<{ id: string }>(
+          `GET /${key}/(?<id>.+)` as "GET /key/:id",
+          (req, resp, { pathParam: { id } }) => {
+            const item = store.getState()[key]?.find((v) => v.id === id)
+            if (!item) {
+              resp.writeStatus("404 Not Found").end()
+              return
+            }
 
-          const item = store.getState()[key]?.find((v) => v.id === id)
-          if (!item) {
-            resp.writeStatus("404 Not Found").end()
-            return
+            resp
+              .writeStatus("200 OK", {
+                "Content-Type": "application/json",
+              })
+              .end(stringify(item))
           }
-
-          resp
-            .writeStatus("200 OK", {
-              "Content-Type": "application/json",
-            })
-            .end(stringify(item))
-        })
+        )
 
         // POST
         server.on(`POST /${key}` as "POST /key", async (req, resp) => {
@@ -262,15 +252,9 @@ async function run() {
         })
 
         // PUT
-        server.on(
+        server.on<{ id: string }>(
           `PUT /${key}/(?<id>.+)` as "PUT /key/:id",
-          async (req, resp) => {
-            const { id } = req.route?.pathParam ?? {}
-            if (!id) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
-
+          async (req, resp, { pathParam: { id } }) => {
             if (req.mimeType !== "application/json") {
               resp.writeStatus("415 Unsupported Media Type").end()
               return
@@ -308,15 +292,9 @@ async function run() {
         )
 
         // PATCH
-        server.on(
+        server.on<{ id: string }>(
           `PATCH /${key}/(?<id>.+)` as "PATCH /key/:id",
-          async (req, resp) => {
-            const { id } = req.route?.pathParam ?? {}
-            if (!id) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
-
+          async (req, resp, { pathParam: { id } }) => {
             if (req.mimeType !== "application/json") {
               resp.writeStatus("415 Unsupported Media Type").end()
               return
@@ -354,15 +332,9 @@ async function run() {
         )
 
         // DELETE
-        server.on(
+        server.on<{ id: string }>(
           `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
-          async (req, resp) => {
-            const { id } = req.route?.pathParam ?? {}
-            if (!id) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
-
+          async (req, resp, { pathParam: { id } }) => {
             store.dispatch({
               type: "DELETE /key/:id",
               payload: {

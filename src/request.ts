@@ -29,9 +29,6 @@ export class Request extends http.IncomingMessage {
   /** @example ["charset=utf-8"] */
   parameters?: string[]
 
-  /** it will be set after `match()` call */
-  route?: MatchingRoute
-
   /** */
   normalizedURL?: URL
 
@@ -96,20 +93,4 @@ type JSONRequestWarnInfo = {
   type: "warn/chunk-is-not-a-buffer"
   message: string
   payload?: unknown
-}
-
-interface MatchingRoute {
-  /** @example "GET /foo/(?<id>.+)" */
-  eventName: string
-
-  /** @example "GET" */
-  method: string
-
-  /** @example RegExp("^/foo/(?<id>.+)$", "i") */
-  pathPattern: RegExp
-
-  /** RegExp matching groups for `pathPattern` */
-  pathParam: {
-    [key: string]: string
-  }
 }

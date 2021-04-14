@@ -35,15 +35,20 @@ export interface Server {
   off(event: "request", listener: (req: Request, resp: Response) => void): this
 
   // routing events
-  on(
+  on<P extends { [key: string]: string } = {}>(
     event: RoutingEvent,
-    listener: (req: Request, resp: Response) => void
+    listener: (req: Request, resp: Response, route: Route<P>) => void
   ): this
-  off(
+  off<P extends { [key: string]: string } = {}>(
     event: RoutingEvent,
-    listener: (req: Request, resp: Response) => void
+    listener: (req: Request, resp: Response, route: Route<P>) => void
   ): this
-  emit(event: RoutingEvent, req: Request, resp: Response): boolean
+  emit<P extends { [key: string]: string } = {}>(
+    event: RoutingEvent,
+    req: Request,
+    resp: Response,
+    route: Route<P>
+  ): boolean
 
   // undefined events
   on(event: never, listener: (...args: any[]) => void): this
@@ -113,14 +118,12 @@ export class Server extends http.Server {
           const match = req.normalizedURL?.pathname.match(pathPattern)
 
           if (match) {
-            req.route = {
-              eventName: routeName,
+            this.emit(routeName, req, resp, {
+              routeName,
               method,
               pathPattern,
               pathParam: match.groups ?? {},
-            }
-
-            this.emit(routeName, req, resp)
+            })
             return
           }
         }
@@ -198,3 +201,17 @@ const METHODS = [
 ] as const
 
 type METHODS = typeof METHODS[number]
+
+interface Route<TPathParam extends { [key: string]: string } = {}> {
+  /** @example "GET /foo/(?<id>.+)" */
+  routeName: RoutingEvent
+
+  /** @example "GET" */
+  method: METHODS
+
+  /** @example RegExp("^/foo/(?<id>.+)$", "i") */
+  pathPattern: RegExp
+
+  /** RegExp matching groups for `pathPattern` */
+  pathParam: TPathParam
+}
