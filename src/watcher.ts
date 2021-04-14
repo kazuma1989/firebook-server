@@ -14,14 +14,10 @@ interface Watcher extends fs.FSWatcher {
   once(event: "warn", listener: (data: string) => void): this
   emit(event: "warn", err: unknown): boolean
 
-  // general
-  on(event: string, listener: (...args: unknown[]) => void): this
-  on(event: string, listener: (...args: any[]) => void): this
-
-  once(event: string, listener: (...args: unknown[]) => void): this
-  once(event: string, listener: (...args: any[]) => void): this
-
-  emit(event: string, ...args: any[]): boolean
+  // undefined event
+  on(event: never, listener: (...args: any[]) => void): this
+  once(event: never, listener: (...args: any[]) => void): this
+  emit(event: never, ...args: any[]): boolean
 }
 
 export function watchFile(filePath: string): Watcher {

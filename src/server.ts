@@ -19,6 +19,18 @@ import { debuglog, nonNullable } from "./util"
  *   console.log(`Server is listening at http://${host}:${port}`)
  * })
  */
+export interface Server {
+  on(event: "request", listener: (req: Request, resp: Response) => void): this
+  on(
+    event: RoutingEvent,
+    listener: (req: Request, resp: Response) => void
+  ): this
+  on(event: never, listener: (...args: any[]) => void): this
+
+  emit(event: RoutingEvent, req: Request, resp: Response): boolean
+  emit(event: never, ...args: any[]): boolean
+}
+
 export class Server extends http.Server {
   constructor() {
     super({
@@ -59,7 +71,7 @@ export class Server extends http.Server {
             return
           }
 
-          this._emit(req.route.eventName as RoutingEvent, req, resp)
+          this.emit(req.route.eventName as RoutingEvent, req, resp)
         } catch (err: unknown) {
           console.error(err)
 
@@ -95,22 +107,6 @@ export class Server extends http.Server {
         process.off("unhandledRejection", uncaughtException)
       })
     })
-  }
-
-  on(event: "request", listener: (req: Request, resp: Response) => void): this
-  on(
-    event: RoutingEvent,
-    listener: (req: Request, resp: Response) => void
-  ): this
-  on(event: string, listener: (...args: unknown[]) => void): this
-  on(event: string, listener: (...args: any[]) => void): this
-  on(event: string, listener: (...args: any[]) => void): this {
-    return super.on(event, listener)
-  }
-
-  private _emit(event: RoutingEvent, req: Request, resp: Response): boolean
-  private _emit(event: string | symbol, ...args: any[]): boolean {
-    return this.emit(event, ...args)
   }
 
   private routes(): Route[] {

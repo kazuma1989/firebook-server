@@ -3,6 +3,15 @@ import * as path from "path"
 
 /**
  */
+export interface Request {
+  on(event: "warn", listener: (info: JSONRequestWarnInfo) => void): this
+  on(event: string, listener: (...args: unknown[]) => void): this
+  on(event: never, listener: (...args: any[]) => void): this
+
+  emit(event: "warn", info: JSONRequestWarnInfo): boolean
+  emit(event: never, ...args: any[]): boolean
+}
+
 export class Request extends http.IncomingMessage {
   readonly method: string
   readonly url: string
@@ -80,7 +89,7 @@ export class Request extends http.IncomingMessage {
     const chunks: Buffer[] = []
     for await (const chunk of this) {
       if (!(chunk instanceof Buffer)) {
-        this._emit("warn", {
+        this.emit("warn", {
           type: "warn/chunk-is-not-a-buffer",
           message: "chunk is not a buffer",
           payload: chunk,
@@ -96,18 +105,6 @@ export class Request extends http.IncomingMessage {
     return {
       ...JSON.parse(body),
     }
-  }
-
-  on(event: "warn", listener: (info: JSONRequestWarnInfo) => void): this
-  on(event: string, listener: (...args: unknown[]) => void): this
-  on(event: string, listener: (...args: any[]) => void): this
-  on(event: string, listener: (...args: any[]) => void): this {
-    return super.on(event, listener)
-  }
-
-  private _emit(event: "warn", info: JSONRequestWarnInfo): boolean
-  private _emit(event: string | symbol, ...args: any[]): boolean {
-    return this.emit(event, ...args)
   }
 }
 

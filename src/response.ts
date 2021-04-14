@@ -2,6 +2,20 @@ import * as http from "http"
 
 /**
  */
+export interface Response {
+  setHeader(
+    name:
+      | "Access-Control-Allow-Headers"
+      | "Access-Control-Allow-Methods"
+      | "Access-Control-Allow-Origin"
+      | "Access-Control-Expose-Headers"
+      | "Content-Type"
+      | "Location",
+    value: number | string | ReadonlyArray<string>
+  ): void
+  setHeader(name: never, value: number | string | ReadonlyArray<string>): void
+}
+
 export class Response extends http.ServerResponse {
   /**
    * @param status
@@ -39,19 +53,6 @@ export class Response extends http.ServerResponse {
     this.writeHead(statusCode, reasonPhrase, headers)
 
     return this
-  }
-
-  setHeader(
-    name:
-      | "Access-Control-Allow-Headers"
-      | "Access-Control-Allow-Methods"
-      | "Access-Control-Allow-Origin"
-      | "Access-Control-Expose-Headers"
-      | "Content-Type"
-      | "Location",
-    value: number | string | ReadonlyArray<string>
-  ): void {
-    super.setHeader(name, value)
   }
 }
 
