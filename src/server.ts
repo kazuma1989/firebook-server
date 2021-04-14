@@ -59,7 +59,7 @@ export class Server extends http.Server {
       ServerResponse: Response,
     })
 
-    this.setMaxListeners(20)
+    this.setMaxListeners(1_000)
 
     this.on("request", (req, resp) => {
       if (!(METHODS as readonly string[]).includes(req.method)) {
