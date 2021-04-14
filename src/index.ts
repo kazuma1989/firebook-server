@@ -99,7 +99,7 @@ async function run() {
         }
       })
 
-      const mimeTypes = {
+      const mimeTypes: Record<string, string> = {
         ".png": "image/png",
         ".jpg": "image/jpg",
         ".jpeg": "image/jpg",
@@ -111,8 +111,7 @@ async function run() {
         "GET /storage/(?<file>.+)",
         (req, resp, { pathParam: { file } }) => {
           const filePath = path.join(storageDir, path.normalize(file))
-          const mimeType: string | undefined =
-            mimeTypes[path.extname(filePath).toLowerCase()]
+          const mimeType = mimeTypes[path.extname(filePath).toLowerCase()]
 
           fs.createReadStream(filePath)
             .once("error", (err) => {
