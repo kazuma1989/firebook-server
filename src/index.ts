@@ -66,7 +66,7 @@ async function run() {
       // ロギング
       server.on("request", (req, resp) => {
         const { method, url } = req
-        resp.on("finish", function (this: typeof resp) {
+        resp.once("finish", function (this: typeof resp) {
           console.log(
             `[${new Date().toJSON()}]`,
             this.statusCode,
@@ -117,7 +117,7 @@ async function run() {
         const filePath = path.join(storageDir, path.normalize(file))
 
         fs.createReadStream(filePath)
-          .on("error", () => {
+          .once("error", () => {
             resp.writeStatus("404 Not Found").end()
           })
           .once("open", () => {
@@ -128,10 +128,10 @@ async function run() {
             )
           })
           .pipe(resp)
-          .on("finish", () => {
+          .once("finish", () => {
             resp.end()
           })
-          .on("error", (err) => {
+          .once("error", (err) => {
             console.error(err)
 
             resp.writeStatus("500 Internal Server Error").end()

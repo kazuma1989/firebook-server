@@ -1,19 +1,20 @@
 import * as http from "http"
+import { debuglog } from "./util"
 
 /**
  */
 export interface Response {
-  setHeader(
-    name:
-      | "Access-Control-Allow-Headers"
-      | "Access-Control-Allow-Methods"
-      | "Access-Control-Allow-Origin"
-      | "Access-Control-Expose-Headers"
-      | "Content-Type"
-      | "Location",
-    value: number | string | ReadonlyArray<string>
-  ): void
-  setHeader(name: never, value: number | string | ReadonlyArray<string>): void
+  // error
+  once(event: "error", listener: (err: Error) => void): this
+
+  // finish
+  once(event: "finish", listener: () => void): this
+
+  // undefined events
+  on(event: never, listener: (...args: any[]) => void): this
+  once(event: never, listener: (...args: any[]) => void): this
+  off(event: never, listener: (...args: any[]) => void): this
+  emit(event: never, ...args: any[]): boolean
 }
 
 export class Response extends http.ServerResponse {
@@ -53,6 +54,24 @@ export class Response extends http.ServerResponse {
     this.writeHead(statusCode, reasonPhrase, headers)
 
     return this
+  }
+
+  setHeader(
+    name:
+      | "Access-Control-Allow-Headers"
+      | "Access-Control-Allow-Methods"
+      | "Access-Control-Allow-Origin"
+      | "Access-Control-Expose-Headers"
+      | "Content-Type"
+      | "Location",
+    value: number | string | ReadonlyArray<string>
+  ): void {
+    if (this.headersSent || this.finished) {
+      debuglog('Headers sent or response finished. Skip "%s: %s"', name, value)
+      return
+    }
+
+    super.setHeader(name, value)
   }
 }
 

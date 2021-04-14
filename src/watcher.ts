@@ -5,18 +5,17 @@ interface Watcher extends fs.FSWatcher {
   prevContent?: string
 
   // changed
-  on(event: "changed", listener: (data: string) => void): this
-  once(event: "changed", listener: (data: string) => void): this
-  emit(event: "changed", data: string): boolean
+  once(event: "changed", listener: (content: string) => void): this
+  emit(event: "changed", content: string): boolean
 
   // warn
   on(event: "warn", listener: (err: unknown) => void): this
-  once(event: "warn", listener: (data: string) => void): this
   emit(event: "warn", err: unknown): boolean
 
-  // undefined event
+  // undefined events
   on(event: never, listener: (...args: any[]) => void): this
   once(event: never, listener: (...args: any[]) => void): this
+  off(event: never, listener: (...args: any[]) => void): this
   emit(event: never, ...args: any[]): boolean
 }
 
