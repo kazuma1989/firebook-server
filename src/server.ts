@@ -79,59 +79,74 @@ export class Server extends http.Server {
       }
     })
 
-    this.on("newListener", (rawEventName, listener) => {
-      const method = METHODS.find((m) => rawEventName.startsWith(`${m} `))
+    let totalRoutes = 0
+    const skippedRoutes = new WeakMap<Response, number>()
+
+    this.on("newListener", (eventName, listener) => {
+      const method = METHODS.find((m) => eventName.startsWith(`${m} `))
       if (!method) return
 
-      const eventName = rawEventName as `${METHODS} ${string}`
+      const routeName = eventName as `${METHODS} ${string}`
 
       let pathPattern: RegExp
       try {
         // GET /assets/(?<file>.+) -> new RegExp("^/assets/(?<file>.+)$", "i")
-        pathPattern = new RegExp(`^${eventName.slice(method.length + 1)}$`, "i")
+        pathPattern = new RegExp(`^${routeName.slice(method.length + 1)}$`, "i")
       } catch (error: unknown) {
         if (error instanceof Error) {
           console.error("WARN", error.message)
         }
 
-        console.error("failed to install", eventName)
+        console.error("failed to install", routeName)
         return
       }
 
-      debuglog("installing route:", eventName)
+      debuglog("installing route:", routeName)
 
-      const onRequest = (req: Request, resp: Response): void => {
+      const onRoute = (req: Request, resp: Response): void => {
         if (resp.headersSent || resp.finished) {
           debuglog("headers sent or response finished")
           return
         }
 
-        if (req.method !== method) return
+        if (req.method === method) {
+          const match = req.normalizedURL?.pathname.match(pathPattern)
 
-        const match = req.normalizedURL?.pathname.match(pathPattern)
-        if (!match) return
+          if (match) {
+            req.route = {
+              eventName: routeName,
+              method,
+              pathPattern,
+              pathParam: match.groups ?? {},
+            }
 
-        req.route = {
-          eventName,
-          method,
-          pathPattern,
-          pathParam: match.groups ?? {},
+            this.emit(routeName, req, resp)
+            return
+          }
         }
 
-        this.emit(eventName, req, resp)
+        // マッチしなかったらカウントを増やす。
+        // リスナー総数と同じになったらそれは 404 を意味する。
+        skippedRoutes.set(resp, (skippedRoutes.get(resp) ?? 0) + 1)
+        if (skippedRoutes.get(resp)! >= totalRoutes) {
+          resp.writeStatus("404 Not Found").end()
+        }
       }
-      this.on("request", onRequest)
+      this.on("request", onRoute)
+      totalRoutes += 1
 
       const onRemoveListener = (
-        _rawEventName: string,
+        _eventName: string,
         _listener: (...args: any[]) => void
       ) => {
-        if (_rawEventName !== rawEventName) return
+        if (_eventName !== eventName) return
         if (_listener !== listener) return
 
-        debuglog("uninstalling route:", _rawEventName)
+        debuglog("uninstalling route:", _eventName)
 
-        this.off("request", onRequest)
+        this.off("request", onRoute)
+        totalRoutes -= 1
+
         this.off("removeListener", onRemoveListener)
       }
       this.on("removeListener", onRemoveListener)
