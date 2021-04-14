@@ -48,13 +48,13 @@ async function run() {
         })
       })
 
-      const store = new Store(
+      const database = new Store(
         reducer,
         JSON.parse(databaseContent) as ReturnType<typeof reducer>
       )
 
       const write = async () => {
-        const content = JSON.stringify(store.getState(), null, 2) + "\n"
+        const content = JSON.stringify(database.getState(), null, 2) + "\n"
 
         watcher.prevContent = content
 
@@ -175,12 +175,13 @@ async function run() {
       )
 
       //
-      Object.keys(store.getState()).forEach((key) => {
-        if (!key.match(/^[A-Za-z0-9_-]+$/i)) return
-
+      const tableKeys = Object.keys(database.getState()).filter(
+        RegExp.prototype.test.bind(/^[A-Za-z0-9_-]+$/)
+      )
+      tableKeys.forEach((key) => {
         // GET all
         server.on(`GET /${key}` as "GET /key", (req, resp) => {
-          const items = store.getState()[key]
+          const items = database.getState()[key]
           if (!items) {
             resp.writeStatus("404 Not Found").end()
             return
@@ -197,7 +198,7 @@ async function run() {
         server.on<{ id: string }>(
           `GET /${key}/(?<id>.+)` as "GET /key/:id",
           (req, resp, { pathParam: { id } }) => {
-            const item = store.getState()[key]?.find((v) => v.id === id)
+            const item = database.getState()[key]?.find((v) => v.id === id)
             if (!item) {
               resp.writeStatus("404 Not Found").end()
               return
@@ -226,7 +227,7 @@ async function run() {
 
           const id = randomID()
 
-          store.dispatch({
+          database.dispatch({
             type: "POST /key",
             payload: {
               key,
@@ -235,7 +236,7 @@ async function run() {
             },
           })
 
-          const item = store.getState()[key]?.find((i) => i.id === id)
+          const item = database.getState()[key]?.find((i) => i.id === id)
           if (!item) {
             resp.writeStatus("500 Internal Server Error").end()
             return
@@ -266,7 +267,7 @@ async function run() {
               return
             }
 
-            store.dispatch({
+            database.dispatch({
               type: "PUT /key/:id",
               payload: {
                 key,
@@ -275,7 +276,7 @@ async function run() {
               },
             })
 
-            const item = store.getState()[key]?.find((i) => i.id === id)
+            const item = database.getState()[key]?.find((i) => i.id === id)
             if (!item) {
               resp.writeStatus("500 Internal Server Error").end()
               return
@@ -306,7 +307,7 @@ async function run() {
               return
             }
 
-            store.dispatch({
+            database.dispatch({
               type: "PATCH /key/:id",
               payload: {
                 key,
@@ -315,7 +316,7 @@ async function run() {
               },
             })
 
-            const item = store.getState()[key]?.find((i) => i.id === id)
+            const item = database.getState()[key]?.find((i) => i.id === id)
             if (!item) {
               resp.writeStatus("500 Internal Server Error").end()
               return
@@ -335,7 +336,7 @@ async function run() {
         server.on<{ id: string }>(
           `DELETE /${key}/(?<id>.+)` as "DELETE /key/:id",
           async (req, resp, { pathParam: { id } }) => {
-            store.dispatch({
+            database.dispatch({
               type: "DELETE /key/:id",
               payload: {
                 key,

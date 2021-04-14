@@ -1,6 +1,6 @@
-export interface DB extends Record<string, Entry[]> {}
+interface Tables extends Record<string, Item[]> {}
 
-interface Entry {
+interface Item {
   id: string
   [key: string]: unknown
 }
@@ -44,7 +44,7 @@ type RestAction =
       }
     }
 
-export function reducer(state: DB, action: RestAction): DB {
+export function reducer(state: Tables, action: RestAction): Tables {
   switch (action.type) {
     case "POST /key":
     case "PUT /key/:id": {
@@ -104,6 +104,7 @@ export function reducer(state: DB, action: RestAction): DB {
     }
 
     default: {
+      const _: never = action
       return state
     }
   }
