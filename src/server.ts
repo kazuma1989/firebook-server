@@ -109,15 +109,15 @@ export class Server extends http.Server {
       debuglog("installing route:", routeName)
 
       const onRoute = (req: Request, resp: Response): void => {
-        if (resp.headersSent || resp.finished) {
-          debuglog("headers sent or response finished")
-          return
-        }
-
         if (req.method === method) {
           const match = req.normalizedURL?.pathname.match(pathPattern)
 
           if (match) {
+            if (resp.headersSent || resp.finished) {
+              debuglog("%s: headers sent or response finished", eventName)
+              return
+            }
+
             this.emit(routeName, req, resp, {
               routeName,
               method,

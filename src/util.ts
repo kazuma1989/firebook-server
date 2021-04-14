@@ -28,3 +28,12 @@ export function randomID() {
 export function nonNullable<T>(value: T): value is NonNullable<T> {
   return value !== null && value !== undefined
 }
+
+/**
+ * null または undefined でないことを型的にも保証する。
+ */
+export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
+  if (value !== null && value !== undefined) return
+
+  throw new Error(`Expected 'value' to be defined, but received ${value}`)
+}

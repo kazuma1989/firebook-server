@@ -1,12 +1,11 @@
 import * as fs from "fs"
 import * as path from "path"
 import { Writer } from "steno"
-import * as util from "util"
 import { helpMessage, parse } from "./cli-option"
 import { reducer } from "./reducer"
 import { Server } from "./server"
 import { Store } from "./store"
-import { randomID } from "./util"
+import { assertIsDefined, randomID } from "./util"
 import { watchFile } from "./watcher"
 
 /**
@@ -68,7 +67,8 @@ async function run() {
         const { method, url } = req
         resp.once("finish", function (this: typeof resp) {
           console.log(
-            `[${new Date().toJSON()}]`,
+            "[%s] %d %s %s %s",
+            new Date().toJSON(),
             this.statusCode,
             this.statusMessage,
             method,
@@ -79,7 +79,7 @@ async function run() {
         req.on("warn", (info) => {
           switch (info.type) {
             case "warn/chunk-is-not-a-buffer": {
-              console.warn(info.message, util.inspect(info.payload))
+              console.warn("%s %O", info.message, info.payload)
               break
             }
           }
@@ -99,18 +99,20 @@ async function run() {
         }
       })
 
+      const mimeTypes = {
+        ".png": "image/png",
+        ".jpg": "image/jpg",
+        ".jpeg": "image/jpg",
+        ".gif": "image/gif",
+      }
+
       // storage ディレクトリの中身は静的ファイルとしてレスポンスする。
       server.on<{ file: string }>(
         "GET /storage/(?<file>.+)",
         (req, resp, { pathParam: { file } }) => {
-          const mimeTypes = {
-            ".png": "image/png",
-            ".jpg": "image/jpg",
-            ".jpeg": "image/jpg",
-            ".gif": "image/gif",
-          }
-
           const filePath = path.join(storageDir, path.normalize(file))
+          const mimeType: string | undefined =
+            mimeTypes[path.extname(filePath).toLowerCase()]
 
           fs.createReadStream(filePath)
             .once("error", (err) => {
@@ -121,8 +123,7 @@ async function run() {
             .once("open", () => {
               resp.setHeader(
                 "Content-Type",
-                mimeTypes[path.extname(filePath).toLowerCase()] ??
-                  "application/octet-stream"
+                mimeType ?? "application/octet-stream"
               )
             })
             .pipe(resp)
@@ -131,13 +132,6 @@ async function run() {
 
       // ファイルアップロードのエンドポイント。
       server.on("POST /storage", async (req, resp) => {
-        const mimeTypes = {
-          ".png": "image/png",
-          ".jpg": "image/jpg",
-          ".jpeg": "image/jpg",
-          ".gif": "image/gif",
-        }
-
         const [ext] =
           Object.entries(mimeTypes).find(([, type]) => type === req.mimeType) ??
           []
@@ -149,9 +143,9 @@ async function run() {
         const filePath = path.join(storageDir, `${randomID()}${ext}`)
 
         req.pipe(fs.createWriteStream(filePath)).on("close", () => {
-          const origin = `http://${
-            req.headers.host ?? `${option.hostname}:${option.port}`
-          }`
+          const origin =
+            req.normalizedURL?.origin ??
+            `http://${option.hostname}:${option.port}`
           const downloadURL = `${origin}/storage/${path.basename(filePath)}`
 
           resp
@@ -174,7 +168,7 @@ async function run() {
         }
       )
 
-      //
+      // データベースの REST 操作
       const tableKeys = Object.keys(database.getState()).filter(
         RegExp.prototype.test.bind(/^[A-Za-z0-9_-]+$/)
       )
@@ -198,7 +192,7 @@ async function run() {
         server.on<{ id: string }>(
           `GET /${key}/(?<id>.+)` as "GET /key/:id",
           (req, resp, { pathParam: { id } }) => {
-            const item = database.getState()[key]?.find((v) => v.id === id)
+            const item = database.getState()[key]?.find((i) => i.id === id)
             if (!item) {
               resp.writeStatus("404 Not Found").end()
               return
@@ -221,7 +215,7 @@ async function run() {
 
           const body = await req.parseBodyAsJSONObject().catch(() => null)
           if (!body) {
-            resp.writeStatus("400 Malformed JSON input").end()
+            resp.writeStatus("400 Malformed JSON Input").end()
             return
           }
 
@@ -237,10 +231,7 @@ async function run() {
           })
 
           const item = database.getState()[key]?.find((i) => i.id === id)
-          if (!item) {
-            resp.writeStatus("500 Internal Server Error").end()
-            return
-          }
+          assertIsDefined(item)
 
           await write()
 
@@ -263,7 +254,7 @@ async function run() {
 
             const body = await req.parseBodyAsJSONObject().catch(() => null)
             if (!body) {
-              resp.writeStatus("400 Malformed JSON input").end()
+              resp.writeStatus("400 Malformed JSON Input").end()
               return
             }
 
@@ -277,10 +268,7 @@ async function run() {
             })
 
             const item = database.getState()[key]?.find((i) => i.id === id)
-            if (!item) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
+            assertIsDefined(item)
 
             await write()
 
@@ -303,7 +291,7 @@ async function run() {
 
             const body = await req.parseBodyAsJSONObject().catch(() => null)
             if (!body) {
-              resp.writeStatus("400 Bad Request").end()
+              resp.writeStatus("400 Malformed JSON Input").end()
               return
             }
 
@@ -317,10 +305,7 @@ async function run() {
             })
 
             const item = database.getState()[key]?.find((i) => i.id === id)
-            if (!item) {
-              resp.writeStatus("500 Internal Server Error").end()
-              return
-            }
+            assertIsDefined(item)
 
             await write()
 
