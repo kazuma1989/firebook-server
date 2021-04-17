@@ -5,7 +5,7 @@ import { helpMessage, parse } from "./cli-option"
 import { reducer } from "./reducer"
 import { Server } from "./server"
 import { Store } from "./store"
-import { assertIsDefined, randomID } from "./util"
+import { assertIsDefined, match, randomID } from "./util"
 import { watchFile } from "./watcher"
 
 /**
@@ -180,11 +180,13 @@ async function run() {
             return
           }
 
+          const matcher = match(req.normalizedURL?.searchParams.entries() ?? [])
+
           resp
             .writeStatus("200 OK", {
               "Content-Type": "application/json",
             })
-            .end(stringify(items))
+            .end(stringify(items.filter(matcher)))
         })
 
         // GET single
