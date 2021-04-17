@@ -8,10 +8,8 @@
       "console": "internalConsole",
       "internalConsoleOptions": "openOnFirstSessionStart",
       "name": "nodemon",
-      "program": "${workspaceFolder}/dist/index.js",
       "request": "launch",
       "restart": true,
-      "runtimeExecutable": "npx",
       "skipFiles": ["<node_internals>/**"],
       "type": "pwa-node",
       "env": {
@@ -19,7 +17,10 @@
       },
 
       // npx nodemon -e js ${workspaceFolder}/dist/index.js
+      "runtimeExecutable": "npx",
       "runtimeArgs": ["nodemon", "-e", "js"],
+      "program": "${workspaceFolder}/dist/index.js",
+      "args": [],
 
       // https://github.com/microsoft/vscode-js-debug/issues/911#issuecomment-762554186
       "nodeVersionHint": 10
