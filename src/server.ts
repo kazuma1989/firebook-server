@@ -128,6 +128,8 @@ export class Server extends http.Server {
           }
         }
 
+        if (resp.headersSent || resp.finished) return
+
         // マッチしなかったらカウントを増やす。
         // リスナー総数と同じになったらそれは 404 を意味する。
         skippedRoutes.set(resp, (skippedRoutes.get(resp) ?? 0) + 1)
