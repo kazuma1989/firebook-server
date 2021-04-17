@@ -1,10 +1,3 @@
-import * as util from "util"
-
-/**
- * 環境変数 NODE_DEBUG にパッケージ名を含むときだけログ出力する。
- */
-export const debuglog = util.debuglog(PACKAGE_NAME)
-
 /**
  * ランダムな ID `[A-Za-z0-9_-]{12}` を作成する。
  * 暗号学的強度はないので本格的な利用には耐えない。
@@ -36,4 +29,35 @@ export function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
   if (value !== null && value !== undefined) return
 
   throw new Error(`Expected 'value' to be defined, but received ${value}`)
+}
+
+/**
+ * 引数の条件に合致するか判定する関数を返す。
+ */
+export function match(
+  search: Iterable<[string, string]>
+): (item: { [key: string]: unknown }) => boolean {
+  const accMap = new Map<string, string[]>()
+
+  for (const [key, value] of search) {
+    let values = accMap.get(key)
+    if (!values) {
+      values = []
+      accMap.set(key, values)
+    }
+
+    values.push(value)
+  }
+
+  return function matcher(item) {
+    for (const [searchKey, searchValues] of accMap.entries()) {
+      const itemValue = `${item[searchKey]}`
+
+      if (!searchValues.includes(itemValue)) {
+        return false
+      }
+    }
+
+    return true
+  }
 }

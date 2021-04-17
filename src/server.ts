@@ -1,7 +1,7 @@
 import * as http from "http"
+import { debuglog } from "./logger"
 import { Request } from "./request"
 import { Response } from "./response"
-import { debuglog } from "./util"
 
 /**
  * @example
