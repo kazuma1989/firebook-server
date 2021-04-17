@@ -72,6 +72,37 @@ test["POST /key"]("ボディの id は無視する", async () => {
   assert.deepStrictEqual(actual, expected)
 })
 
+test["POST /key"]("重複する id だった場合は追加や上書きをしない", async () => {
+  const state = {
+    posts: [
+      { id: "a", text: "A" },
+      { id: "b", text: "B" },
+    ],
+    comments: [{ id: "x", value: "X" }],
+  }
+
+  const actual = reducer(state, {
+    type: "POST /key",
+    payload: {
+      key: "posts",
+      id: "a",
+      body: {
+        text: "A2",
+      },
+    },
+  })
+
+  const expected: typeof state = {
+    posts: [
+      { id: "a", text: "A" },
+      { id: "b", text: "B" },
+    ],
+    comments: [{ id: "x", value: "X" }],
+  }
+
+  assert.deepStrictEqual(actual, expected)
+})
+
 test["PUT /key/:id"]("新規追加できる", async () => {
   const state = {
     posts: [

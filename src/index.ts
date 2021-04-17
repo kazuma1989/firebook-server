@@ -231,8 +231,16 @@ async function run() {
             },
           })
 
-          const item = database.getState()[key]?.find((i) => i.id === id)
-          assertIsDefined(item)
+          const items = database.getState()[key]
+          assertIsDefined(items)
+
+          const item = items.find((i) => i.id === id)
+          if (!item) {
+            // item が見つからないのはランダム ID が既存のものと衝突してしまったとき。
+            // リトライすれば解決するはずなので 503 で返す。
+            resp.writeStatus("503 Service Unavailable").end()
+            return
+          }
 
           await write()
 
