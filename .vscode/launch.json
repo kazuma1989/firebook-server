@@ -20,10 +20,19 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["nodemon", "-e", "js"],
       "program": "${workspaceFolder}/dist/index.js",
-      "args": [],
+      "args": ["--database", "${input:database}"],
 
       // https://github.com/microsoft/vscode-js-debug/issues/911#issuecomment-762554186
       "nodeVersionHint": 10
+    }
+  ],
+
+  "inputs": [
+    {
+      "id": "database",
+      "description": "database",
+      "type": "promptString",
+      "default": "db.json"
     }
   ]
 }
